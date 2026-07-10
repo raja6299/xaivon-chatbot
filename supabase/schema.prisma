@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+schema {
+  // Use the supabase adapter
+  // https://github.com/prisma/prisma-db-ns-adapter
+  datasource db {
+    provider = "postgresql"
+    url      = env("SUPABASE_DB_URL")
+  }
+}
+
+model leads {
+  id          BIGSERIAL    PRIMARY KEY
+  full_name   VARCHAR(255)  NOT NULL
+  email       VARCHAR(255)  NOT NULL
+  company     VARCHAR(255)
+  phone       VARCHAR(20)
+  session_id  VARCHAR(255)
+  status      VARCHAR(50)   DEFAULT 'new'
+  created_at  TIMESTAMP     DEFAULT NOW()
+
+  @@unique([email, session_id])
+  @@index([email])
+  @@index([session_id])
+}
+
+// Add indexes for better query performance
+model _prisma_migrations {
+  id          String       @id @default(uuid())
+  checksum    String
+  finished_at DateTime?    @default(now())
+  migration   String
+  name        String
+  rolled_back_at DateTime?
+  started_at  DateTime?    @default(now())
+  applied_steps_count Integer? @default(0)
+  logs         String?
+}
+
+model profiles {
+  id           UUID         @id @default(dgen())
+  email        String       @unique
+  full_name    String?
+  company      String?
+  phone        String?
+  created_at   TIMESTAMP    @default(now())
+  updated_at   TIMESTAMP    @default(now())
+
+  @@index([email])
+}

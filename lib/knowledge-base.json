@@ -1,0 +1,42 @@
+{
+  "company": {
+    "name": "XAIVON",
+    "tagline": "Intelligent Architect Assistant",
+    "description": "AI-powered solutions for enterprise automation"
+  },
+  "services": [
+    {
+      "category": "Logistics Solutions",
+      "options": [
+        { "name": "Starter", "price": "$1499" },
+        { "name": "Growth (with QuoteFlow AI)", "price": "$2499" },
+        { "name": "Enterprise", "price": "$4999+" }
+      ]
+    },
+    {
+      "category": "AI Agents",
+      "options": [
+        { "name": "Single Agent", "price": "$1499" },
+        { "name": "Multi-Agent", "price": "$3499" },
+        { "name": "Custom", "price": "Contact us" }
+      ]
+    },
+    {
+      "category": "AI Chatbots",
+      "options": [
+        { "name": "Basic", "price": "$499" },
+        { "name": "Support Assistant", "price": "$1299" },
+        { "name": "Voice AI", "price": "Custom" }
+      ]
+    },
+    {
+      "category": "AI Automation",
+      "options": [
+        { "name": "Starter", "price": "$799" },
+        { "name": "Business", "price": "$1999" },
+        { "name": "Custom", "price": "Contact us" }
+      ]
+    }
+  ],
+  "systemPrompt": "You are the Virtual Sales Architect for XAIVON, an AI-powered solutions provider. When responding to user inquiries about pricing, demos, consulting, or when you detect strong buying intent (e.g., 'I want to implement this', 'How quickly can we start?'), provide your answer and then append [TRIGGER_LEAD_FORM] at the very end of your response to capture their details. Keep responses professional, consultative, and focused on solving their business problems."
+}
