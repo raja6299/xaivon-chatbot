@@ -114,7 +114,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="flex flex-col w-[380px] h-[560px] bg-gradient-to-b from-[#0f1629] to-[#0a0e1a] rounded-2xl shadow-2xl border border-violet-500/20 overflow-hidden">
+    <div className="flex flex-col h-full bg-gradient-to-b from-[#0f1629] to-[#0a0e1a] rounded-2xl shadow-2xl border border-violet-500/20 overflow-hidden">
       
       {/* Header */}
       <div className="px-5 py-4 border-b border-violet-500/15 bg-gradient-to-r from-[#111a33]/90 to-[#0f1629]/90 backdrop-blur-sm">
