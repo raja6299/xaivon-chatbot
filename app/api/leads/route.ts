@@ -1,27 +1,13 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from '@/lib/supabase';
 
-// Lazily initialize Supabase client inside the handler so missing env vars
-// at build time (Next.js "collect page data") do not crash the build.
-// Node.js runtime keeps the service-role key safely server-side.
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceRoleKey) {
-    throw new Error('Supabase environment variables are not configured');
-  }
-
-  return createClient(url, serviceRoleKey);
-}
+export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
   try {
-    // Parse request body
     const body = await req.json();
     const { fullName, email, company, phone, sessionId } = body;
 
-    // Server-side validation (required fields)
     if (!fullName || !email) {
       return NextResponse.json(
         { error: 'Full name and email are required' },
@@ -29,7 +15,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return NextResponse.json(
@@ -38,10 +23,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Insert lead into Supabase database
-    console.log('Lead submission:', { email, fullName, sessionId, timestamp: new Date().toISOString() });
-
-    const supabase = getSupabase();
+    const supabase = await getSupabaseClient();
 
     const { data, error } = await supabase
       .from('leads')
@@ -57,27 +39,23 @@ export async function POST(req: Request) {
       ])
       .select();
 
-    // Handle Supabase errors
     if (error) {
-      console.error('Supabase insert error:', error.message);
+      console.error('Supabase error:', error.message);
       return NextResponse.json(
-        { error: 'Failed to save lead. Please try again later.' },
+        { error: 'Failed to save lead' },
         { status: 500 }
       );
     }
 
-    // Success response
-    console.log('Lead saved successfully:', data?.[0]?.id);
     return NextResponse.json({
       success: true,
-      message: 'Lead saved successfully',
       leadId: data?.[0]?.id,
     });
 
   } catch (error) {
     console.error('Leads API error:', error);
     return NextResponse.json(
-      { error: 'Failed to process lead submission' },
+      { error: 'Failed to process request' },
       { status: 500 }
     );
   }

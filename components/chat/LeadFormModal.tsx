@@ -38,6 +38,13 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
+  // Handle modal close
+  const handleClose = () => {
+    setFormData({ fullName: '', email: '', company: '', phone: '' });
+    setError(null);
+    onClose();
+  };
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,7 +86,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
       <div className="relative bg-[#111827] border border-violet-500/30 rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
         {/* Close button */}
         <button
-          onClick={onClose}
+          onClick={handleClose}
           disabled={isSubmitting}
           className="absolute top-3 right-3 text-gray-400 hover:text-white transition-colors"
         >
