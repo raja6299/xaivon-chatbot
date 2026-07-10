@@ -2,7 +2,7 @@ import { openai } from '@ai-sdk/openai';
 import { streamText, convertToModelMessages } from 'ai';
 import { knowledgeBase } from '@/lib/knowledge-base';
 
-export const runtime = 'nodejs'; // Changed from 'edge' to 'nodejs' for better env var support on Vercel
+
 
 export async function POST(req: Request) {
   try {
