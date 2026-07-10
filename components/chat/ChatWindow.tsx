@@ -2,89 +2,120 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport, type UIMessage, type TextUIPart } from 'ai';
 import { ChatMessage } from './ChatMessage';
 import { LeadFormModal } from './LeadFormModal';
 
+// Extract plain text from a v7 UIMessage (which stores content in `parts`, not `content`)
+function getMessageText(message: UIMessage): string {
+  return message.parts
+    .filter((part): part is TextUIPart => part.type === 'text')
+    .map((part) => part.text)
+    .join('');
+}
+
+const LEAD_TRIGGER = '[TRIGGER_LEAD_FORM]';
+
 export function ChatWindow({ onClose }: { onClose: () => void }) {
-  const { messages, input, handleInputChange, handleSubmit, error, isLoading } = useChat();
+  const { messages, sendMessage, status, error } = useChat({
+    transport: new DefaultChatTransport({ api: '/api/chat' }),
+  });
+  const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isLeadFormOpen, setIsLeadFormOpen] = useState(false);
-  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  // Loading state: v7 uses `status` ('submitted' | 'streaming' | 'ready' | 'error')
+  const isLoading = status === 'submitted' || status === 'streaming';
 
   // Auto-scroll logic
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLeadFormOpen]);
 
-  // Clean form submission handler
+  // Create new session when component mounts
+  useEffect(() => {
+    const createSession = async () => {
+      try {
+        const response = await fetch('/api/sessions', { method: 'POST' });
+        const data = await response.json();
+        if (data.sessionId) {
+          setSessionId(data.sessionId);
+          console.log('Session created:', data.sessionId);
+        }
+      } catch (err) {
+        console.error('Failed to create session:', err);
+      }
+    };
+
+    createSession();
+  }, []);
+
+  // Open lead form when the latest assistant message contains the trigger
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (
+      lastMessage &&
+      lastMessage.role === 'assistant' &&
+      getMessageText(lastMessage).includes(LEAD_TRIGGER) &&
+      !isLeadFormOpen
+    ) {
+      setIsLeadFormOpen(true);
+    }
+  }, [messages, isLeadFormOpen]);
+
+  // Clean form submission handler (v7: manage input locally, sendMessage with text)
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!input.trim()) return; // Empty guard
-    handleSubmit(e);
+    sendMessage({ text: input });
+    setInput('');
   };
 
-  // Handle lead form submission
+  // Handle lead form submission - links lead to the chat session
   const handleLeadFormSubmit = async (formData: {
     fullName: string;
     email: string;
     company: string;
     phone: string;
   }) => {
-    setIsSubmittingForm(true);
-    try {
-      const response = await fetch('/api/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          session_id: crypto.randomUUID() // Generate session ID for uniqueness
-        }),
-      });
+    const response = await fetch('/api/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fullName: formData.fullName,
+        email: formData.email,
+        company: formData.company,
+        phone: formData.phone,
+        sessionId: sessionId, // Links lead to chat session
+      }),
+    });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save lead');
-      }
-
-      // Success - will auto-close after 2 seconds in LeadFormModal
-    } catch (err) {
-      console.error('Lead submission error:', err);
-      throw err;
-    } finally {
-      setIsSubmittingForm(false);
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      // Throw so LeadFormModal can display the error and keep modal open for retry
+      throw new Error(data.error || 'Failed to submit lead');
     }
+    // LeadFormModal handles success state internally (auto-closes after 2s)
   };
 
   // Handle lead form close - only re-enable input if form wasn't submitted successfully
   const handleLeadFormClose = () => {
     setIsLeadFormOpen(false);
-    // Note: Input re-enabling happens in the disabled logic below based on form state
   };
 
   return (
     <div className="flex flex-col h-full bg-[#111827] text-white overflow-hidden">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg, idx) => {
-          // Check if message has lead trigger
-          const hasLeadTrigger = msg.content.includes('[TRIGGER_LEAD_FORM]');
-          const cleanedContent = msg.content.replace(/\[TRIGGER_LEAD_FORM\]/g, '').trim();
-
-          // If this is the latest assistant message and has trigger, open lead form after rendering
-          if (
-            idx === messages.length - 1 &&
-            msg.role === 'assistant' &&
-            hasLeadTrigger &&
-            !isLeadFormOpen
-          ) {
-            // Use setTimeout to ensure the message is rendered before opening modal
-            setTimeout(() => setIsLeadFormOpen(true), 0);
-          }
+          const rawText = getMessageText(msg);
+          const cleanedContent = rawText.replace(/\[TRIGGER_LEAD_FORM\]/g, '').trim();
 
           return (
             <ChatMessage
               key={idx}
               role={msg.role as 'user' | 'assistant'}
-              content={hasLeadTrigger ? cleanedContent : msg.content}
+              content={cleanedContent}
             />
           );
         })}
@@ -100,7 +131,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
         {/* Textarea with proper disabling logic */}
         <textarea
           value={input}
-          onChange={handleInputChange}
+          onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();

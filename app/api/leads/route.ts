@@ -1,103 +1,83 @@
-"use client";
-
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-// Node.js runtime for Supabase service key (not exposed in edge)
+// Lazily initialize Supabase client inside the handler so missing env vars
+// at build time (Next.js "collect page data") do not crash the build.
+// Node.js runtime keeps the service-role key safely server-side.
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-export async function POST(request: Request) {
+  if (!url || !serviceRoleKey) {
+    throw new Error('Supabase environment variables are not configured');
+  }
+
+  return createClient(url, serviceRoleKey);
+}
+
+export async function POST(req: Request) {
   try {
-    // Parse and validate request body
-    const body = await request.json();
-    const { fullName, email, company, phone, session_id } = body;
+    // Parse request body
+    const body = await req.json();
+    const { fullName, email, company, phone, sessionId } = body;
 
-    // Server-side validation
-    if (!fullName || typeof fullName !== 'string' || fullName.trim().length < 2) {
+    // Server-side validation (required fields)
+    if (!fullName || !email) {
       return NextResponse.json(
-        { error: 'Full name must be at least 2 characters' },
+        { error: 'Full name and email are required' },
         { status: 400 }
       );
     }
 
-    if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
       return NextResponse.json(
-        { error: 'Please provide a valid email address' },
+        { error: 'Invalid email format' },
         { status: 400 }
       );
     }
 
-    if (company !== undefined && typeof company !== 'string') {
-      return NextResponse.json(
-        { error: 'Company must be a string' },
-        { status: 400 }
-      );
-    }
+    // Insert lead into Supabase database
+    console.log('Lead submission:', { email, fullName, sessionId, timestamp: new Date().toISOString() });
 
-    if (phone !== undefined && typeof phone !== 'string') {
-      return NextResponse.json(
-        { error: 'Phone must be a string' },
-        { status: 400 }
-      );
-    }
+    const supabase = getSupabase();
 
-    // Log the submission for debugging
-    console.log('Lead submission received:', {
-      email: email.trim(),
-      timestamp: new Date().toISOString(),
-      session_id: session_id || null,
-    });
-
-    // Initialize Supabase client with service role key
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Supabase configuration missing');
-    }
-
-    // Import Supabase client only on server side
-    const { createClient } = await import('@supabase/supabase-js');
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Insert lead into database
     const { data, error } = await supabase
       .from('leads')
-      .insert({
-        full_name: fullName.trim(),
-        email: email.trim().toLowerCase(),
-        company: company?.trim() || null,
-        phone: phone?.trim() || null,
-        session_id: session_id || null,
-        status: 'new',
-      })
+      .insert([
+        {
+          full_name: fullName,
+          email: email,
+          company: company || null,
+          phone: phone || null,
+          session_id: sessionId || null,
+          status: 'new',
+        },
+      ])
       .select();
 
+    // Handle Supabase errors
     if (error) {
-      // Handle duplicate email error
-      if (error.code === '23505') {
-        return NextResponse.json(
-          { error: 'This email has already been submitted' },
-          { status: 400 }
-        );
-      }
-
-      console.error('Supabase insert error:', error);
+      console.error('Supabase insert error:', error.message);
       return NextResponse.json(
-        { error: 'Failed to save lead. Please try again.' },
+        { error: 'Failed to save lead. Please try again later.' },
         { status: 500 }
       );
     }
 
     // Success response
-    return NextResponse.json(
-      { success: true, message: 'Lead saved successfully' },
-      { status: 200 }
-    );
+    console.log('Lead saved successfully:', data?.[0]?.id);
+    return NextResponse.json({
+      success: true,
+      message: 'Lead saved successfully',
+      leadId: data?.[0]?.id,
+    });
 
   } catch (error) {
-    console.error('Lead submission error:', error);
+    console.error('Leads API error:', error);
     return NextResponse.json(
-      { error: 'An unexpected error occurred. Please try again.' },
+      { error: 'Failed to process lead submission' },
       { status: 500 }
     );
   }

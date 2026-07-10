@@ -1,7 +1,8 @@
-import { streamText } from 'ai';
+import { streamText, convertToModelMessages } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { knowledgeBase } from '@/lib/knowledge-base';
 
+// Edge runtime - only expose OPENAI_API_KEY (no secrets on edge)
 export const runtime = 'edge';
 
 const openai = createOpenAI({
@@ -19,15 +20,15 @@ export async function POST(req: Request) {
       });
     }
 
-    // Use system prompt from knowledge-base.json
+    // Convert incoming UIMessages (with parts) to ModelMessages for streamText
     const result = streamText({
       model: openai('gpt-4o-mini'),
       system: knowledgeBase.systemPrompt,
-      messages,
+      messages: await convertToModelMessages(messages),
     });
 
-    // Return streaming response (IMPORTANT: do NOT wrap in manual Response)
-    return result.toDataStreamResponse();
+    // AI SDK v7 UI message stream protocol (replaces deprecated toDataStreamResponse)
+    return result.toUIMessageStreamResponse();
 
   } catch (error) {
     console.error('Chat API Error:', error);
