@@ -1,42 +1,189 @@
 {
   "company": {
     "name": "XAIVON",
-    "tagline": "Intelligent Architect Assistant",
-    "description": "AI-powered solutions for enterprise automation"
+    "tagline": "AI-Powered Business Infrastructure",
+    "description": "XAIVON builds production-grade AI infrastructure for logistics companies and enterprises that need to scale operations without scaling headcount.",
+    "founder": "Raja",
+    "founderTitle": "Founder & CEO",
+    "website": "https://xaivon.com",
+    "email": "raja@xaivon.com",
+    "calendly": "https://calendly.com/xaivon"
   },
+  "mission": "To eliminate operational friction, reduce manual data entry, and drastically increase response speed. By systematically automating complex workflows, we restore profit margins and empower teams to focus on high-value strategic execution instead of repetitive tasks.",
+  "vision": "Artificial intelligence must transition from a novelty to the core operational infrastructure of modern business. We do not sell hype or generic templates. We partner with serious business owners to design secure, scalable solutions tailored to their exact data ecosystem.",
+  "whyXaivonExists": "As companies scale, operations inevitably break. Historically, as transaction volume increases, companies are forced to linearly scale their human capital—throwing more staff at data entry, dispatching, and customer tracking. This traditional approach erodes profit margins, creates critical bottlenecks, and introduces unacceptable error rates. XAIVON exists to decouple your growth from your headcount.",
   "services": [
     {
-      "category": "Logistics Solutions",
-      "options": [
-        { "name": "Starter", "price": "$1499" },
-        { "name": "Growth (with QuoteFlow AI)", "price": "$2499" },
-        { "name": "Enterprise", "price": "$4999+" }
+      "category": "Logistics Automation",
+      "description": "End-to-end automation for freight brokers, carriers, and 3PL providers.",
+      "tiers": [
+        {
+          "name": "Starter",
+          "price": "$1,499",
+          "includes": ["AI Chatbot for customer inquiries", "Automated quote request intake", "CRM integration", "Basic analytics dashboard", "Email & chat support"]
+        },
+        {
+          "name": "Growth",
+          "price": "$2,499",
+          "includes": ["Everything in Starter", "QuoteFlow AI (automated quoting engine)", "Load board integration", "Carrier matching automation", "Advanced analytics", "Priority support"]
+        },
+        {
+          "name": "Enterprise",
+          "price": "$4,999+",
+          "includes": ["Everything in Growth", "Custom AI agents for dispatch", "Full TMS integration", "Multi-channel communication (Voice, SMS, Email)", "Dedicated account manager", "Custom SLA", "White-label options"]
+        }
       ]
     },
     {
       "category": "AI Agents",
-      "options": [
-        { "name": "Single Agent", "price": "$1499" },
-        { "name": "Multi-Agent", "price": "$3499" },
-        { "name": "Custom", "price": "Contact us" }
+      "description": "Autonomous AI workers that handle repetitive business tasks 24/7.",
+      "tiers": [
+        {
+          "name": "Single Agent",
+          "price": "$1,499",
+          "includes": ["One specialized AI agent", "Single workflow automation", "API integration", "Performance monitoring", "Monthly optimization"]
+        },
+        {
+          "name": "Multi-Agent",
+          "price": "$3,499",
+          "includes": ["Up to 5 coordinated AI agents", "Cross-workflow automation", "Custom decision logic", "Advanced monitoring dashboard", "Bi-weekly optimization"]
+        },
+        {
+          "name": "Custom Enterprise",
+          "price": "Contact us",
+          "includes": ["Unlimited agents", "Full business process automation", "Custom AI model fine-tuning", "Dedicated infrastructure", "24/7 support", "On-premise deployment options"]
+        }
       ]
     },
     {
       "category": "AI Chatbots",
-      "options": [
-        { "name": "Basic", "price": "$499" },
-        { "name": "Support Assistant", "price": "$1299" },
-        { "name": "Voice AI", "price": "Custom" }
+      "description": "Intelligent conversational assistants for customer support, sales, and internal operations.",
+      "tiers": [
+        {
+          "name": "Basic",
+          "price": "$499",
+          "includes": ["Website chatbot", "FAQ automation", "Lead capture", "Basic customization", "Email support"]
+        },
+        {
+          "name": "Support Assistant",
+          "price": "$1,299",
+          "includes": ["Everything in Basic", "Multi-language support", "CRM integration", "Ticket routing", "Analytics dashboard", "Priority support"]
+        },
+        {
+          "name": "Voice AI",
+          "price": "Custom",
+          "includes": ["Voice-enabled AI assistant", "Phone call handling", "Natural language understanding", "Call transcription", "Sentiment analysis", "Custom voice persona"]
+        }
       ]
     },
     {
       "category": "AI Automation",
-      "options": [
-        { "name": "Starter", "price": "$799" },
-        { "name": "Business", "price": "$1999" },
-        { "name": "Custom", "price": "Contact us" }
+      "description": "Workflow automation that connects your existing tools and eliminates manual processes.",
+      "tiers": [
+        {
+          "name": "Starter",
+          "price": "$799",
+          "includes": ["Up to 3 workflow automations", "Basic integrations (Zapier, Make)", "Email notifications", "Monthly reporting"]
+        },
+        {
+          "name": "Business",
+          "price": "$1,999",
+          "includes": ["Up to 10 workflow automations", "Advanced integrations", "Custom API connections", "Real-time monitoring", "Priority support"]
+        },
+        {
+          "name": "Custom",
+          "price": "Contact us",
+          "includes": ["Unlimited automations", "Enterprise integrations", "Custom development", "Dedicated support team", "SLA guarantee"]
+        }
+      ]
+    },
+    {
+      "category": "Website Development",
+      "description": "Modern, conversion-optimized websites built with cutting-edge technology.",
+      "tiers": [
+        {
+          "name": "Business Website",
+          "price": "$2,499",
+          "includes": ["Custom design", "Responsive layout", "SEO optimization", "Contact forms", "Analytics integration"]
+        },
+        {
+          "name": "Web Application",
+          "price": "$4,999+",
+          "includes": ["Full-stack web application", "User authentication", "Database integration", "API development", "Admin dashboard"]
+        }
       ]
     }
   ],
-  "systemPrompt": "You are the Virtual Sales Architect for XAIVON, an AI-powered solutions provider. When responding to user inquiries about pricing, demos, consulting, or when you detect strong buying intent (e.g., 'I want to implement this', 'How quickly can we start?'), provide your answer and then append [TRIGGER_LEAD_FORM] at the very end of your response to capture their details. Keep responses professional, consultative, and focused on solving their business problems."
+  "industries": [
+    "Logistics & Freight",
+    "Supply Chain & 3PL",
+    "E-Commerce",
+    "Healthcare",
+    "Financial Services",
+    "Real Estate",
+    "Manufacturing",
+    "Professional Services",
+    "Retail",
+    "Transportation"
+  ],
+  "faq": [
+    {
+      "question": "What industries does XAIVON serve?",
+      "answer": "We specialize in Logistics & Freight but serve any industry that processes high volumes of repetitive tasks—including E-Commerce, Healthcare, Financial Services, Real Estate, Manufacturing, and Professional Services."
+    },
+    {
+      "question": "How long does it take to implement AI automation?",
+      "answer": "Most implementations take 2–4 weeks depending on complexity. Starter packages can be deployed in as little as 1 week. Enterprise integrations may take 4–8 weeks for full deployment and testing."
+    },
+    {
+      "question": "What is QuoteFlow AI?",
+      "answer": "QuoteFlow AI is our proprietary automated quoting engine designed for logistics companies. It ingests quote requests from any channel (email, web form, phone), extracts shipment details, checks carrier rates, and generates accurate quotes—reducing response time from hours to seconds."
+    },
+    {
+      "question": "Do I need technical knowledge to use your AI systems?",
+      "answer": "No. Our solutions are designed for business operators, not engineers. We handle all technical implementation, integration, and maintenance. You get a clean dashboard and simple controls."
+    },
+    {
+      "question": "What is a Free AI Audit?",
+      "answer": "We offer a complimentary analysis of your current workflows to identify exactly where AI can eliminate bottlenecks, reduce costs, and increase throughput. There is no obligation—just actionable insights."
+    },
+    {
+      "question": "Can XAIVON integrate with our existing tools?",
+      "answer": "Yes. We integrate with all major platforms including Salesforce, HubSpot, Slack, Microsoft Teams, Google Workspace, QuickBooks, and virtually any system with an API."
+    },
+    {
+      "question": "What makes XAIVON different from other AI agencies?",
+      "answer": "We are not a marketing agency that bolts on AI as a buzzword. We are infrastructure engineers. Every solution we build is production-grade, secure, and designed to handle real operational load—not demos."
+    },
+    {
+      "question": "Do you offer ongoing support?",
+      "answer": "Yes. Every package includes support. Growth and Enterprise plans include priority support with dedicated account management. We also offer monthly optimization reviews to continuously improve performance."
+    },
+    {
+      "question": "How much does AI automation cost?",
+      "answer": "Our packages start at $499 for basic chatbots and go up to $4,999+ for enterprise logistics automation. We also offer custom pricing for complex projects. The best way to get an accurate quote is to schedule a free strategy call."
+    },
+    {
+      "question": "What is an AI Voice Agent?",
+      "answer": "An AI Voice Agent handles phone calls autonomously—answering customer inquiries, qualifying leads, scheduling appointments, and routing calls. It sounds natural and operates 24/7 without human intervention."
+    }
+  ],
+  "implementationProcess": [
+    "Discovery & Audit — We analyze your current operations and identify automation opportunities.",
+    "Solution Design — We architect a custom AI solution tailored to your specific workflows.",
+    "Development & Integration — We build and integrate the solution with your existing tools.",
+    "Testing & Optimization — We rigorously test every workflow and optimize for performance.",
+    "Deployment & Training — We deploy to production and train your team on the new system.",
+    "Ongoing Support — We provide continuous monitoring, optimization, and support."
+  ],
+  "competitiveAdvantages": [
+    "Production-grade infrastructure, not prototypes",
+    "Deep logistics domain expertise",
+    "Full-stack AI capability (Chatbots, Agents, Voice, Automation)",
+    "Proprietary QuoteFlow AI technology",
+    "No long-term contracts required",
+    "Transparent pricing with no hidden fees",
+    "Rapid deployment (1–4 weeks)",
+    "24/7 AI operation with human oversight"
+  ]
 }

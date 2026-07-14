@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
 
 interface LeadFormData {
   fullName: string;
@@ -16,6 +15,8 @@ interface LeadFormModalProps {
   onSubmit: (data: LeadFormData) => Promise<void>;
 }
 
+type FormStatus = 'idle' | 'submitting' | 'success' | 'error';
+
 export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps) {
   const [formData, setFormData] = useState<LeadFormData>({
     fullName: '',
@@ -23,177 +24,233 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
     company: '',
     phone: '',
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [formStatus, setFormStatus] = useState<FormStatus>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof LeadFormData, string>>>({});
 
-  // Handle form input changes
+  const validateField = useCallback((name: keyof LeadFormData, value: string): string => {
+    switch (name) {
+      case 'fullName':
+        if (!value.trim()) return 'Name is required';
+        if (value.trim().length < 2) return 'Name must be at least 2 characters';
+        return '';
+      case 'email':
+        if (!value.trim()) return 'Email is required';
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Enter a valid email';
+        return '';
+      default:
+        return '';
+    }
+  }, []);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    if (fieldErrors[name as keyof LeadFormData]) {
+      const error = validateField(name as keyof LeadFormData, value);
+      setFieldErrors(prev => ({ ...prev, [name]: error }));
+    }
   };
 
-  // Validate email format
-  const isValidEmail = (email: string) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    const error = validateField(name as keyof LeadFormData, value);
+    setFieldErrors(prev => ({ ...prev, [name]: error }));
   };
 
-  // Handle modal close
   const handleClose = () => {
     setFormData({ fullName: '', email: '', company: '', phone: '' });
-    setError(null);
+    setFormStatus('idle');
+    setErrorMessage('');
+    setFieldErrors({});
     onClose();
   };
 
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setErrorMessage('');
 
-    // Client validation
-    if (!formData.fullName.trim() || formData.fullName.length < 2) {
-      setError('Full name must be at least 2 characters');
-      return;
-    }
-    if (!formData.email.trim() || !isValidEmail(formData.email)) {
-      setError('Please enter a valid email address');
-      return;
-    }
+    const errors: Partial<Record<keyof LeadFormData, string>> = {};
+    errors.fullName = validateField('fullName', formData.fullName);
+    errors.email = validateField('email', formData.email);
+    setFieldErrors(errors);
 
-    setIsSubmitting(true);
+    if (errors.fullName || errors.email) return;
+
+    setFormStatus('submitting');
     try {
       await onSubmit(formData);
-      setSubmitSuccess(true);
-      // Auto-close after 2 seconds
+      setFormStatus('success');
       setTimeout(() => {
-        setSubmitSuccess(false);
         setFormData({ fullName: '', email: '', company: '', phone: '' });
+        setFormStatus('idle');
+        setFieldErrors({});
         onClose();
-      }, 2000);
-    } catch (err) {
-      setError('Submission failed. Please try again.');
-      console.error('Lead form submission error:', err);
-    } finally {
-      setIsSubmitting(false);
+      }, 2500);
+    } catch {
+      setFormStatus('error');
+      setErrorMessage('Submission failed. Please try again.');
     }
   };
 
-  // If not open, render null
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="relative bg-[#111827] border border-violet-500/30 rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
-        {/* Close button */}
-        <button
-          onClick={handleClose}
-          disabled={isSubmitting}
-          className="absolute top-3 right-3 text-gray-400 hover:text-white transition-colors"
-        >
-          <X size={20} />
-        </button>
+    <div className="lead-form-overlay" role="dialog" aria-modal="true" aria-label="Consultation form">
+      <div className="w-full max-w-[340px] mx-3 animate-slide-up">
+        <div className="bg-[#111827]/95 border border-violet-500/20 rounded-2xl shadow-2xl shadow-violet-500/5 overflow-hidden">
 
-        {/* Success state */}
-        {submitSuccess ? (
-          <div className="text-center py-8">
-            <p className="text-lg text-violet-400 font-semibold">Thank you! We'll be in touch.</p>
-          </div>
-        ) : (
-          <>
-            <h2 className="text-xl font-bold text-white mb-2">Get Your Free Consultation</h2>
-            <p className="text-sm text-gray-400 mb-4">Share your details to receive personalized recommendations.</p>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Full Name */}
+          {/* Form Header */}
+          <div className="px-5 pt-5 pb-3 border-b border-violet-500/10">
+            <div className="flex items-center justify-between">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  name="fullName"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  required
-                  className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
-                />
+                <h2 className="text-white font-semibold text-sm">Get Your Free Consultation</h2>
+                <p className="text-slate-400 text-[11px] mt-0.5">We&apos;ll get back to you within 24 hours.</p>
               </div>
-
-              {/* Email */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  required
-                  className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
-                />
-              </div>
-
-              {/* Company */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Company
-                </label>
-                <input
-                  type="text"
-                  name="company"
-                  value={formData.company}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
-                />
-              </div>
-
-              {/* Phone */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Phone
-                </label>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-violet-500 disabled:opacity-50"
-                />
-              </div>
-
-              {/* Error message */}
-              {error && (
-                <div className="p-3 bg-red-900/50 border border-red-500 rounded text-red-200 text-sm">
-                  {error}
-                </div>
-              )}
-
-              {/* Submit button */}
               <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-2 rounded transition-colors disabled:opacity-50 flex items-center justify-center"
+                onClick={handleClose}
+                disabled={formStatus === 'submitting'}
+                className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all duration-200 disabled:opacity-40"
+                aria-label="Close form"
               >
-                {isSubmitting ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Submitting...
-                  </>
-                ) : (
-                  'Submit'
-                )}
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
               </button>
-            </form>
-          </>
-        )}
+            </div>
+          </div>
+
+          {/* Form Body */}
+          <div className="px-5 py-4 max-h-[55vh] overflow-y-auto scrollbar-thin">
+            {formStatus === 'success' ? (
+              <div className="text-center py-6 animate-fade-in-up">
+                <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center mb-3">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                </div>
+                <p className="text-white font-semibold text-sm">Thank you!</p>
+                <p className="text-slate-400 text-xs mt-1">Our team will reach out soon.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>
+                {/* Full Name */}
+                <div>
+                  <label htmlFor="lead-fullName" className="block text-xs font-medium text-slate-300 mb-1.5">
+                    Full Name <span className="text-violet-400">*</span>
+                  </label>
+                  <input
+                    id="lead-fullName"
+                    type="text"
+                    name="fullName"
+                    value={formData.fullName}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    disabled={formStatus === 'submitting'}
+                    placeholder="John Smith"
+                    className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 placeholder-slate-600 transition-all duration-200 outline-none border ${
+                      fieldErrors.fullName
+                        ? 'border-red-500/50 focus:ring-1 focus:ring-red-500/30'
+                        : 'border-violet-500/10 focus:border-violet-500/30 focus:ring-1 focus:ring-violet-500/20'
+                    } disabled:opacity-40`}
+                    autoComplete="name"
+                  />
+                  {fieldErrors.fullName && (
+                    <p className="text-red-400 text-[10px] mt-1 ml-1">{fieldErrors.fullName}</p>
+                  )}
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label htmlFor="lead-email" className="block text-xs font-medium text-slate-300 mb-1.5">
+                    Email <span className="text-violet-400">*</span>
+                  </label>
+                  <input
+                    id="lead-email"
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    disabled={formStatus === 'submitting'}
+                    placeholder="john@company.com"
+                    className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 placeholder-slate-600 transition-all duration-200 outline-none border ${
+                      fieldErrors.email
+                        ? 'border-red-500/50 focus:ring-1 focus:ring-red-500/30'
+                        : 'border-violet-500/10 focus:border-violet-500/30 focus:ring-1 focus:ring-violet-500/20'
+                    } disabled:opacity-40`}
+                    autoComplete="email"
+                  />
+                  {fieldErrors.email && (
+                    <p className="text-red-400 text-[10px] mt-1 ml-1">{fieldErrors.email}</p>
+                  )}
+                </div>
+
+                {/* Company */}
+                <div>
+                  <label htmlFor="lead-company" className="block text-xs font-medium text-slate-300 mb-1.5">
+                    Company
+                  </label>
+                  <input
+                    id="lead-company"
+                    type="text"
+                    name="company"
+                    value={formData.company}
+                    onChange={handleChange}
+                    disabled={formStatus === 'submitting'}
+                    placeholder="Acme Inc."
+                    className="w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 placeholder-slate-600 transition-all duration-200 outline-none border border-violet-500/10 focus:border-violet-500/30 focus:ring-1 focus:ring-violet-500/20 disabled:opacity-40"
+                    autoComplete="organization"
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label htmlFor="lead-phone" className="block text-xs font-medium text-slate-300 mb-1.5">
+                    Phone
+                  </label>
+                  <input
+                    id="lead-phone"
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    disabled={formStatus === 'submitting'}
+                    placeholder="+1 (555) 000-0000"
+                    className="w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 placeholder-slate-600 transition-all duration-200 outline-none border border-violet-500/10 focus:border-violet-500/30 focus:ring-1 focus:ring-violet-500/20 disabled:opacity-40"
+                    autoComplete="tel"
+                  />
+                </div>
+
+                {/* Error */}
+                {formStatus === 'error' && (
+                  <div className="flex items-center gap-2 bg-red-900/20 border border-red-500/20 rounded-xl px-3 py-2.5 animate-fade-in-up">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+                    <span className="text-red-300 text-xs">{errorMessage}</span>
+                  </div>
+                )}
+
+                {/* Submit */}
+                <button
+                  type="submit"
+                  disabled={formStatus === 'submitting'}
+                  className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-medium text-sm py-2.5 rounded-xl transition-all duration-200 shadow-lg shadow-violet-500/15 hover:shadow-violet-500/25 disabled:opacity-50 disabled:hover:from-violet-600 disabled:hover:to-purple-600 flex items-center justify-center gap-2"
+                >
+                  {formStatus === 'submitting' ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      Schedule Consultation
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
