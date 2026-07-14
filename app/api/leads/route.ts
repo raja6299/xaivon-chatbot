@@ -28,40 +28,28 @@ async function getSupabaseClientSafe() {
 }
 
 export async function POST(req: Request) {
-  let currentStage = 'init';
   try {
-    // 1. Parsing
-    currentStage = 'parsing_request';
     const body = await req.json();
     const { fullName, email, company, phone, sessionId } = body;
 
-    // 2. Validation
-    currentStage = 'validation';
+    // 1. Validation
     if (!fullName || !email) {
-      return NextResponse.json({ stage: currentStage, error: 'Full name and email are required' }, { status: 400 });
+      return NextResponse.json({ error: 'Full name and email are required' }, { status: 400 });
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return NextResponse.json({ stage: currentStage, error: 'Invalid email format' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
     }
 
-    // 3. Supabase Client Init
-    currentStage = 'supabase_client_init';
+    // 2. Supabase Client Init
     const supabase = await getSupabaseClientSafe();
 
     if (!supabase) {
-      currentStage = 'supabase_client_missing_graceful_fallback';
-      console.warn('[LEADS API] Supabase not configured. Logging lead to server output.');
-      console.log('[LEADS API] Lead data:', JSON.stringify({ fullName, email, company, phone, sessionId }));
-      return NextResponse.json({
-        stage: currentStage,
-        success: true,
-        note: 'Lead received. Database connection pending configuration.',
-      });
+      console.error('[LEADS API] ERROR: Supabase client missing. Check env vars.');
+      return NextResponse.json({ error: 'Database connection not configured' }, { status: 500 });
     }
 
-    // 4. Supabase Insert
-    currentStage = 'supabase_insert';
+    // 3. Supabase Insert (Matches exact live schema expected after migration)
     const insertPayload = {
       name: fullName,
       email: email,
@@ -77,46 +65,29 @@ export async function POST(req: Request) {
       .select();
 
     if (error) {
-      currentStage = 'supabase_insert_error';
+      console.error('[LEADS API] Supabase insert error:', error);
       
-      // If table doesn't exist, still return success with logged data
-      if (error.code === '42P01') {
-        console.warn('[LEADS API] Table "leads" does not exist. Lead logged to console.');
-        console.log('[LEADS API] Lead data:', insertPayload);
-        return NextResponse.json({
-          stage: currentStage,
-          success: true,
-          note: 'Lead received. Database table pending setup.',
-        });
-      }
-      
-      // For duplicate email+session constraint violations, still succeed
+      // Handle unique constraint violations gracefully
       if (error.code === '23505') {
-        return NextResponse.json({ stage: currentStage, success: true });
+        return NextResponse.json({ success: true, note: 'Lead already exists for this session' });
       }
 
-      return NextResponse.json({
-        stage: currentStage,
-        error: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-        payload: insertPayload
+      return NextResponse.json({ 
+        error: `Database Error: ${error.message}` 
       }, { status: 500 });
     }
 
-    // 5. Success Response
-    currentStage = 'response';
+    // 4. Success
     return NextResponse.json({
-      stage: currentStage,
       success: true,
       leadId: data?.[0]?.id,
     });
 
   } catch (error) {
-    return NextResponse.json({
-      stage: currentStage,
-      error: error instanceof Error ? error.message : String(error)
-    }, { status: 500 });
+    console.error('[LEADS API] FATAL ERROR:', error);
+    return NextResponse.json(
+      { error: 'An unexpected error occurred while processing your request' },
+      { status: 500 }
+    );
   }
 }
