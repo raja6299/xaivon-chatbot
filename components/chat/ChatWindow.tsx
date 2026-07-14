@@ -6,6 +6,9 @@ import { DefaultChatTransport, type UIMessage, type TextUIPart } from 'ai';
 import { ChatMessage } from './ChatMessage';
 import { LeadFormModal } from './LeadFormModal';
 import { CalendarModal } from './CalendarModal';
+import { VoiceRecorder } from './VoiceRecorder';
+import { VoicePlayer } from './VoicePlayer';
+import { useVoice } from '../../hooks/useVoice';
 
 function getMessageText(message: UIMessage): string {
   return message.parts
@@ -77,6 +80,10 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [hasSubmittedLead, setHasSubmittedLead] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+
+  // Voice integration
+  const { speak, stopOutput } = useVoice();
+  const prevIsLoading = useRef<boolean>(false);
 
   const isLoading = status === 'submitted' || status === 'streaming';
 
@@ -157,19 +164,39 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
     }
   }, [messages, isLeadFormOpen, hasSubmittedLead]);
 
+  // TTS Trigger: when loading finishes and last message is assistant
+  useEffect(() => {
+    if (prevIsLoading.current && !isLoading) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.role === 'assistant') {
+        const text = getMessageText(lastMessage);
+        // Do not auto-speak the lead trigger itself 
+        if (!text.includes(LEAD_TRIGGER)) {
+           speak(text);
+        }
+      }
+    }
+    prevIsLoading.current = isLoading;
+  }, [isLoading, messages, speak]);
+
   // Submit handler
-  const onSubmit = useCallback((e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const onSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
+    e?.preventDefault();
     if (!input.trim() || isLoading) return;
+    
+    // Stop any ongoing voice output when user sends a new message
+    stopOutput();
+
     sendMessage({ text: input });
     setInput('');
-  }, [input, isLoading, sendMessage]);
+  }, [input, isLoading, sendMessage, stopOutput]);
 
   // Quick suggestion
   const handleQuickSuggestion = useCallback((text: string) => {
     if (isLoading) return;
+    stopOutput();
     sendMessage({ text });
-  }, [isLoading, sendMessage]);
+  }, [isLoading, sendMessage, stopOutput]);
 
   // Lead form submit
   const handleLeadFormSubmit = async (formData: {
@@ -205,9 +232,23 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
   const handleRetry = () => {
     const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
     if (lastUserMsg) {
+      stopOutput();
       sendMessage({ text: getMessageText(lastUserMsg) });
     }
   };
+
+  const handleTranscription = useCallback((text: string, isFinal: boolean) => {
+    // Overwrite the current input with interim text. 
+    // In a production scenario with caret tracking, this would append, 
+    // but for chatbot voice, full replacement of current utterance is standard.
+    if (text) setInput(text);
+    if (isFinal && text.trim() && !isLoading) {
+       // A short timeout lets the UI update before submitting
+       setTimeout(() => {
+         onSubmit();
+       }, 50);
+    }
+  }, [isLoading, onSubmit]);
 
   return (
     <div className="flex flex-col h-full w-full bg-gradient-to-b from-[#0f1629] to-[#0a0e1a] overflow-hidden relative">
@@ -335,6 +376,9 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* ─── VOICE PLAYER ─── */}
+      <VoicePlayer />
+
       {/* ─── INPUT AREA (sticky) ─── */}
       <div className="shrink-0 border-t border-violet-500/8 bg-[#0d1322]/90 backdrop-blur-md">
         <form onSubmit={onSubmit} className="px-3.5 py-3">
@@ -365,6 +409,10 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
                 <path d="M22 2L11 13" /><path d="M22 2L15 22L11 13L2 9L22 2Z" />
               </svg>
             </button>
+            <VoiceRecorder 
+              onTranscription={handleTranscription} 
+              disabled={isLoading || isLeadFormOpen}
+            />
           </div>
         </form>
         <div className="text-center pb-2">
