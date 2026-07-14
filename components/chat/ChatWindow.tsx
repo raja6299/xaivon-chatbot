@@ -179,7 +179,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
     const response = await fetch('/api/leads', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...formData, sessionId }),
+      body: JSON.stringify({ ...formData, sessionId, messages }),
     });
     const data = await response.json();
     if (!response.ok || !data.success) {

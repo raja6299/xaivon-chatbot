@@ -1,0 +1,175 @@
+import { generateObject } from 'ai';
+import { groq } from '@ai-sdk/groq';
+import { z } from 'zod';
+
+export interface CRMLeadPayload {
+  leadInformation: {
+    fullName: string;
+    email: string;
+    company: string;
+    phone: string | null;
+  };
+  businessInformation: {
+    industry: string;
+    companySize: string;
+    painPoints: string[];
+    currentSoftware: string[];
+    budget: string;
+    timeline: string;
+    decisionMaker: string;
+  };
+  conversationSummary: string;
+  leadScore: number;
+  recommendedService: string;
+  intentLevel: 'Low' | 'Medium' | 'High';
+  qualificationStatus: 'Unqualified' | 'Qualified' | 'Highly Qualified';
+  timestamp: string;
+  sessionId: string;
+}
+
+export interface FormDataPayload {
+  fullName: string;
+  email: string;
+  company: string;
+  phone?: string | null;
+}
+
+/**
+ * Calculates a configurable lead score based on the conversation history and provided form data.
+ */
+export function calculateLeadScore(messages: Array<{ role: string; content: string }>, formData: FormDataPayload): number {
+  let score = 0;
+  const fullText = messages
+    .filter((m) => m.role === 'user')
+    .map((m) => m.content.toLowerCase())
+    .join(' ');
+
+  // Base scoring on provided info
+  if (formData.company && formData.company.length > 0) score += 10;
+  if (formData.phone && formData.phone.length > 0) score += 10;
+
+  // Keyword scoring
+  if (fullText.includes('pricing') || fullText.includes('cost') || fullText.includes('how much')) score += 20;
+  if (fullText.includes('demo') || fullText.includes('book') || fullText.includes('call') || fullText.includes('meeting')) score += 30;
+  if (fullText.includes('automation') || fullText.includes('automate')) score += 25;
+  if (fullText.includes('budget')) score += 15;
+  if (fullText.includes('timeline') || fullText.includes('soon') || fullText.includes('urgent') || fullText.includes('month') || fullText.includes('week')) score += 10;
+  if (fullText.includes('ceo') || fullText.includes('founder') || fullText.includes('owner') || fullText.includes('manager') || fullText.includes('director')) score += 15;
+
+  return Math.min(score, 100);
+}
+
+/**
+ * Uses LLM to extract structured lead intelligence from the conversation history.
+ */
+export async function generateLeadIntelligence(messages: Array<{ role: string; content: string }>) {
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY is missing');
+  }
+
+  const conversationText = messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
+
+  const { object } = await generateObject({
+    model: groq('llama-3.3-70b-versatile'),
+    schema: z.object({
+      industry: z.string().describe('The industry the user belongs to, or "Unknown"'),
+      companySize: z.string().describe('The company size mentioned, or "Unknown"'),
+      painPoints: z.array(z.string()).describe('List of pain points or problems mentioned'),
+      currentSoftware: z.array(z.string()).describe('Any software tools they currently use'),
+      budget: z.string().describe('Mentioned budget, or "Unknown"'),
+      timeline: z.string().describe('Mentioned timeline, or "Unknown"'),
+      decisionMaker: z.string().describe('Role of the user if mentioned (e.g., CEO, Founder), or "Unknown"'),
+      conversationSummary: z.string().describe('A short, 2-3 sentence executive summary of what the lead wants'),
+      recommendedService: z.string().describe('The best matching XAIVON service: Website Development, Logistics Automation, AI Chatbot, AI Agents, or AI Automation'),
+      intentLevel: z.enum(['Low', 'Medium', 'High']).describe('Estimate of buying intent based on the conversation'),
+    }),
+    prompt: `Analyze the following chatbot conversation between a user and XAIVON (an enterprise AI agency). Extract the business intelligence.\n\nConversation:\n${conversationText}`,
+  });
+
+  return object;
+}
+
+/**
+ * Builds the complete provider-independent CRM payload.
+ */
+export async function buildCRMPayload(
+  formData: FormDataPayload,
+  messages: Array<{ role: string; content: string }>,
+  sessionId: string
+): Promise<CRMLeadPayload> {
+  const score = calculateLeadScore(messages, formData);
+  
+  // Try to generate intelligence, fallback if it fails to prevent blocking submission
+  let intelligence;
+  try {
+    intelligence = await generateLeadIntelligence(messages);
+  } catch {
+    // Fallback if LLM extraction fails
+    intelligence = {
+      industry: 'Unknown',
+      companySize: 'Unknown',
+      painPoints: [],
+      currentSoftware: [],
+      budget: 'Unknown',
+      timeline: 'Unknown',
+      decisionMaker: 'Unknown',
+      conversationSummary: 'Extraction failed or skipped.',
+      recommendedService: 'Needs Manual Review',
+      intentLevel: score > 50 ? 'High' : (score > 20 ? 'Medium' : 'Low') as 'Low' | 'Medium' | 'High',
+    };
+  }
+
+  const qualificationStatus = score >= 70 ? 'Highly Qualified' : (score >= 40 ? 'Qualified' : 'Unqualified');
+
+  return {
+    leadInformation: {
+      fullName: formData.fullName,
+      email: formData.email,
+      company: formData.company,
+      phone: formData.phone || null,
+    },
+    businessInformation: {
+      industry: intelligence.industry,
+      companySize: intelligence.companySize,
+      painPoints: intelligence.painPoints,
+      currentSoftware: intelligence.currentSoftware,
+      budget: intelligence.budget,
+      timeline: intelligence.timeline,
+      decisionMaker: intelligence.decisionMaker,
+    },
+    conversationSummary: intelligence.conversationSummary,
+    leadScore: score,
+    recommendedService: intelligence.recommendedService,
+    intentLevel: intelligence.intentLevel,
+    qualificationStatus,
+    timestamp: new Date().toISOString(),
+    sessionId,
+  };
+}
+
+/**
+ * Main entry point for the CRM integration layer.
+ * Processes the lead, logs the internal summary, and returns the payload.
+ * In a real implementation, this would push to HubSpot/Salesforce via adapters.
+ */
+export async function processLeadForCRM(
+  formData: FormDataPayload,
+  messages: Array<{ role: string; content: string }>,
+  sessionId: string
+) {
+  const crmPayload = await buildCRMPayload(formData, messages, sessionId);
+  
+  // "Do NOT show this summary to users. Internal use only."
+  // Simulate pushing to an internal CRM by logging securely on the backend.
+  console.log('--- ENTERPRISE CRM PAYLOAD GENERATED ---');
+  console.log(`Company: ${crmPayload.leadInformation.company}`);
+  console.log(`Industry: ${crmPayload.businessInformation.industry}`);
+  console.log(`Pain Point: ${crmPayload.businessInformation.painPoints.join(', ') || 'None identified'}`);
+  console.log(`Interest: ${crmPayload.intentLevel}`);
+  console.log(`Timeline: ${crmPayload.businessInformation.timeline}`);
+  console.log(`Recommended Solution: ${crmPayload.recommendedService}`);
+  console.log(`Lead Score: ${crmPayload.leadScore}`);
+  console.log('----------------------------------------');
+
+  return crmPayload;
+}

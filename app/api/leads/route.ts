@@ -165,6 +165,17 @@ export async function POST(req: Request) {
       );
     }
 
+    // Process Enterprise CRM Payload (Phase 5)
+    // Run securely on the server. If it fails, do not block lead submission.
+    if (body.messages && Array.isArray(body.messages) && body.messages.length > 0) {
+      try {
+        const { processLeadForCRM } = await import('@/lib/crm');
+        await processLeadForCRM(body, body.messages, sessionId);
+      } catch (crmError) {
+        console.error('CRM Processing Error:', crmError);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       leadId: data?.[0]?.id,
