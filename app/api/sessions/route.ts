@@ -45,17 +45,13 @@ export async function POST() {
         .select();
 
       if (error) {
-        console.error('[SESSIONS API] Supabase error:', error.message);
         // Still return the session ID even if DB insert fails
       }
-    } else {
-      console.warn('[SESSIONS API] Supabase not configured — using local session ID only.');
     }
 
     return NextResponse.json({ sessionId });
 
-  } catch (error) {
-    console.error('[SESSIONS API] FATAL ERROR:', error instanceof Error ? error.message : error);
+  } catch {
     // Always return a valid session ID, even on error
     return NextResponse.json({ sessionId: uuidv4() });
   }

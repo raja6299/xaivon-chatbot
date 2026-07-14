@@ -176,7 +176,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, note: 'Lead already exists for this session' });
       }
 
-      console.error('[LEADS API] Supabase insert error:', error.message);
       return NextResponse.json(
         { error: `Database Error: ${error.message}` },
         { status: 500 }
@@ -188,8 +187,7 @@ export async function POST(req: Request) {
       leadId: data?.[0]?.id,
     });
 
-  } catch (error) {
-    console.error('[LEADS API] FATAL ERROR:', error instanceof Error ? error.message : error);
+  } catch {
     return NextResponse.json(
       { error: 'An unexpected error occurred while processing your request' },
       { status: 500 }

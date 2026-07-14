@@ -112,7 +112,6 @@ ${knowledgeBase.competitiveAdvantages.map((a: string) => `- ${a}`).join('\n')}
 export async function POST(req: Request) {
   try {
     if (!process.env.GROQ_API_KEY) {
-      console.error('[CHAT API] GROQ_API_KEY missing');
       return new Response(
         JSON.stringify({ error: 'Service temporarily unavailable. Please try again later.' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
@@ -137,10 +136,7 @@ export async function POST(req: Request) {
 
     return response.toUIMessageStreamResponse();
 
-  } catch (error: unknown) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    console.error('[CHAT API] Error:', err.message);
-
+  } catch {
     return new Response(
       JSON.stringify({ error: 'Something went wrong. Please try again.' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
