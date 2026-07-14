@@ -54,13 +54,21 @@ export const chatRequestSchema = z.object({
 });
 
 export const leadRequestSchema = z.object({
-  fullName: z.string().min(2).max(60),
+  fullName: z.string().min(2).max(60).regex(/^[a-zA-Z\s\-']+$/, "Invalid characters in name"),
   email: z.string().email().max(100),
   company: z.string().min(2).max(100),
   phone: z.string().max(20).optional().nullable(),
   sessionId: z.string().optional(),
   website: z.string().optional(), // Honeypot
   messages: z.array(z.any()).optional(),
+}).superRefine((data, ctx) => {
+  const countLetters = (str: string) => (str.match(/\p{L}/gu) || []).length;
+  if (countLetters(data.fullName) < 2) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Name must have at least 2 letters", path: ["fullName"] });
+  }
+  if (countLetters(data.company) < 2) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Company must have at least 2 letters", path: ["company"] });
+  }
 });
 
 // ==========================================

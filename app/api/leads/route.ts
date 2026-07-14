@@ -5,11 +5,6 @@ export const runtime = 'nodejs';
 import { isValidPhoneNumber } from 'libphonenumber-js';
 import { checkRateLimit, sanitizeInput, leadRequestSchema, logAnalytics, logSecurity } from '@/lib/security';
 
-function hasMinLetters(value: string, min: number): boolean {
-  const letters = value.replace(/[^a-zA-Z\u00C0-\u024F\u0400-\u04FF]/g, '');
-  return letters.length >= min;
-}
-
 /**
  * Attempts to get a Supabase client. Returns null if env vars are missing/placeholder.
  */
@@ -84,40 +79,7 @@ export async function POST(req: Request) {
     const phone = body.phone ? sanitizeInput(body.phone) : '';
     const sessionId = body.sessionId ? sanitizeInput(body.sessionId) : '';
 
-    // Server-side logical validation — NEVER trust client
-
-    // Name: required, 2-60 chars, letters/spaces/hyphens/apostrophes
-    const NAME_RE = /^[a-zA-Z\s\-']+$/;
-    if (!fullName) {
-      return NextResponse.json({ error: 'Please enter your full name.' }, { status: 400 });
-    }
-    if (fullName.length < 2 || fullName.length > 60) {
-      return NextResponse.json({ error: 'Name must be between 2 and 60 characters.' }, { status: 400 });
-    }
-    if (!NAME_RE.test(fullName) || !hasMinLetters(fullName, 2)) {
-      return NextResponse.json({ error: 'Please enter a valid name.' }, { status: 400 });
-    }
-
-    // Email: required, valid format
-    if (!email) {
-      return NextResponse.json({ error: 'Please enter your email address.' }, { status: 400 });
-    }
-    const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
-    if (!EMAIL_RE.test(email.toLowerCase())) {
-      return NextResponse.json({ error: 'Please enter a valid business email.' }, { status: 400 });
-    }
     const cleanEmail = email.toLowerCase();
-
-    // Company: required, 2-100 chars, must contain at least 2 letters
-    if (!company) {
-      return NextResponse.json({ error: 'Please enter your company name.' }, { status: 400 });
-    }
-    if (company.length < 2 || company.length > 100) {
-      return NextResponse.json({ error: 'Company name must be between 2 and 100 characters.' }, { status: 400 });
-    }
-    if (!hasMinLetters(company, 2)) {
-      return NextResponse.json({ error: 'Please enter a valid company name.' }, { status: 400 });
-    }
 
     // Phone: optional, strict international validation
     let cleanPhone: string | null = null;
