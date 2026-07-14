@@ -63,7 +63,7 @@ export async function POST(req: Request) {
     // 4. Supabase Insert
     currentStage = 'supabase_insert';
     const insertPayload = {
-      full_name: fullName,
+      name: fullName,
       email: email,
       company: company || null,
       phone: phone || null,
