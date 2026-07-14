@@ -33,6 +33,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [isLeadFormOpen, setIsLeadFormOpen] = useState(false);
+  const [hasSubmittedLead, setHasSubmittedLead] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
   const isLoading = status === 'submitted' || status === 'streaming';
@@ -62,7 +63,13 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
       // Ignore parse errors
     }
 
-    // 2. Restore or create session
+    // 2. Restore lead submission state
+    const leadSubmitted = localStorage.getItem('xaivon_chat_lead_submitted');
+    if (leadSubmitted === 'true') {
+      setHasSubmittedLead(true);
+    }
+
+    // 3. Restore or create session
     const initializeSession = async () => {
       const storedSession = localStorage.getItem('xaivon_chat_session_id');
       if (storedSession) {
@@ -99,12 +106,13 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
       lastMessage &&
       lastMessage.role === 'assistant' &&
       getMessageText(lastMessage).includes(LEAD_TRIGGER) &&
-      !isLeadFormOpen
+      !isLeadFormOpen &&
+      !hasSubmittedLead
     ) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsLeadFormOpen(true);
     }
-  }, [messages, isLeadFormOpen]);
+  }, [messages, isLeadFormOpen, hasSubmittedLead]);
 
   // Submit handler
   const onSubmit = useCallback((e: React.FormEvent<HTMLFormElement>) => {
@@ -136,6 +144,10 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
     if (!response.ok || !data.success) {
       throw new Error(data.error || 'Failed to submit');
     }
+    
+    // Mark lead as submitted successfully and persist it
+    setHasSubmittedLead(true);
+    localStorage.setItem('xaivon_chat_lead_submitted', 'true');
   };
 
   // Retry after error
