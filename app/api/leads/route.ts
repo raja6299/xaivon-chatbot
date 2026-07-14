@@ -29,8 +29,6 @@ async function getSupabaseClientSafe() {
 
 export async function POST(req: Request) {
   try {
-    console.log('[LEADS API] Request received');
-
     const body = await req.json();
     const { fullName, email, company, phone, sessionId } = body;
 
@@ -54,7 +52,6 @@ export async function POST(req: Request) {
     const supabase = await getSupabaseClientSafe();
 
     if (supabase) {
-      console.log('[LEADS API] Supabase connected — inserting lead');
       const { data, error } = await supabase
         .from('leads')
         .insert([
@@ -82,7 +79,6 @@ export async function POST(req: Request) {
         }
         // For duplicate email+session constraint violations, still succeed
         if (error.code === '23505') {
-          console.log('[LEADS API] Duplicate lead — already exists.');
           return NextResponse.json({ success: true });
         }
         return NextResponse.json(
@@ -91,7 +87,6 @@ export async function POST(req: Request) {
         );
       }
 
-      console.log('[LEADS API] Lead saved successfully, ID:', data?.[0]?.id);
       return NextResponse.json({
         success: true,
         leadId: data?.[0]?.id,

@@ -33,7 +33,6 @@ export async function POST() {
     const supabase = await getSupabaseClientSafe();
 
     if (supabase) {
-      console.log('[SESSIONS API] Supabase connected — creating session');
       const { error } = await supabase
         .from('chat_sessions')
         .insert([

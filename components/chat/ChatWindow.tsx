@@ -101,6 +101,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
       getMessageText(lastMessage).includes(LEAD_TRIGGER) &&
       !isLeadFormOpen
     ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsLeadFormOpen(true);
     }
   }, [messages, isLeadFormOpen]);

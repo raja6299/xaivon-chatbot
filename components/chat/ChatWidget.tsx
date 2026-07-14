@@ -12,6 +12,7 @@ export function ChatWidget() {
   // Lazy-mount: mount ChatWindow on first open, never unmount after that
   useEffect(() => {
     if (isOpen && !hasMounted) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHasMounted(true);
     }
   }, [isOpen, hasMounted]);
