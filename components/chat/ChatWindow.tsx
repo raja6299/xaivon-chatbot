@@ -22,6 +22,46 @@ const QUICK_SUGGESTIONS = [
   { icon: '🤖', text: 'What is QuoteFlow AI?' },
 ];
 
+function getContextualSuggestions(messages: UIMessage[]): { icon: string; text: string }[] {
+  if (messages.length === 0) return QUICK_SUGGESTIONS;
+
+  const lastMsg = messages[messages.length - 1];
+  if (lastMsg.role !== 'assistant') return [];
+
+  const text = getMessageText(lastMsg).toLowerCase();
+  
+  if (text.includes('pricing') || text.includes('cost') || text.includes('tier') || text.includes('investment')) {
+    return [
+      { icon: '📅', text: 'Book a Demo' },
+      { icon: '💼', text: 'Contact Sales' },
+      { icon: '⚙️', text: 'What is included in the Enterprise tier?' },
+    ];
+  }
+
+  if (text.includes('agent') || text.includes('quoteflow') || text.includes('automation')) {
+    return [
+      { icon: '💰', text: 'I need pricing' },
+      { icon: '📅', text: 'Can we schedule a call?' },
+      { icon: '🌐', text: 'Website Development' },
+    ];
+  }
+
+  if (text.includes('website') || text.includes('web') || text.includes('design')) {
+    return [
+      { icon: '💰', text: 'I need pricing' },
+      { icon: '🚀', text: 'Logistics Automation' },
+      { icon: '📅', text: 'Book a Demo' },
+    ];
+  }
+
+  return [
+    { icon: '💰', text: 'I need pricing' },
+    { icon: '🤖', text: 'AI Agents' },
+    { icon: '🚀', text: 'Logistics Automation' },
+    { icon: '📅', text: 'Book a Demo' },
+  ];
+}
+
 export function ChatWindow({ onClose }: { onClose: () => void }) {
   // Use a fixed generic ID for the chat instance to maintain state internally if needed
   const { messages, sendMessage, status, error, setMessages } = useChat({
@@ -235,6 +275,22 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
               />
             );
           })}
+
+        {/* Contextual Suggestions */}
+        {messages.length > 0 && !isLoading && !isLeadFormOpen && !hasSubmittedLead && messages[messages.length - 1]?.role === 'assistant' && (
+          <div className="flex flex-wrap gap-2 pt-1 pb-2 animate-fade-in-up">
+            {getContextualSuggestions(messages).map((suggestion) => (
+              <button
+                key={suggestion.text}
+                onClick={() => handleQuickSuggestion(suggestion.text)}
+                className="px-3 py-1.5 bg-[#151d35] hover:bg-violet-500/15 border border-violet-500/15 hover:border-violet-500/30 text-violet-200 text-xs rounded-full transition-all duration-200 font-medium whitespace-nowrap shadow-sm shadow-violet-500/5 hover:shadow-violet-500/10"
+              >
+                <span className="mr-1.5">{suggestion.icon}</span>
+                {suggestion.text}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Typing Indicator */}
         {isLoading && (
