@@ -23,6 +23,14 @@ export interface CRMLeadPayload {
   recommendedService: string;
   intentLevel: 'Low' | 'Medium' | 'High';
   qualificationStatus: 'Unqualified' | 'Qualified' | 'Highly Qualified';
+  escalationStatus: 'None' | 'Pending' | 'Escalated';
+  meetingRequested: boolean;
+  meetingType: 'Discovery Call' | 'Strategy Session' | 'Technical Consultation' | 'AI Assessment' | 'Demo Session' | 'None';
+  assignedSalesStage: 'New' | 'Discovery' | 'Qualified' | 'Proposal';
+  priority: 'Low' | 'Medium' | 'High' | 'Critical';
+  followUpRecommendation: string;
+  handoffReason: string;
+  salesNotes: string;
   timestamp: string;
   sessionId: string;
 }
@@ -82,8 +90,14 @@ export async function generateLeadIntelligence(messages: Array<{ role: string; c
       conversationSummary: z.string().describe('A short, 2-3 sentence executive summary of what the lead wants'),
       recommendedService: z.string().describe('The best matching XAIVON service: Website Development, Logistics Automation, AI Chatbot, AI Agents, or AI Automation'),
       intentLevel: z.enum(['Low', 'Medium', 'High']).describe('Estimate of buying intent based on the conversation'),
+      escalationStatus: z.enum(['None', 'Pending', 'Escalated']).describe('Whether the user requested to speak to a human'),
+      meetingRequested: z.boolean().describe('Did the user agree to or request a meeting?'),
+      meetingType: z.enum(['Discovery Call', 'Strategy Session', 'Technical Consultation', 'AI Assessment', 'Demo Session', 'None']).describe('The most appropriate meeting type'),
+      priority: z.enum(['Low', 'Medium', 'High', 'Critical']).describe('Priority based on budget and intent'),
+      followUpRecommendation: z.string().describe('What the human sales rep should do next'),
+      handoffReason: z.string().describe('Why this is being escalated (e.g. "Requested demo", "High budget", "Legal discussion"), or "None"'),
     }),
-    prompt: `Analyze the following chatbot conversation between a user and XAIVON (an enterprise AI agency). Extract the business intelligence.\n\nConversation:\n${conversationText}`,
+    prompt: `Analyze the following chatbot conversation between a user and XAIVON (an enterprise AI agency). Extract the business intelligence for the CRM.\n\nConversation:\n${conversationText}`,
   });
 
   return object;
@@ -116,10 +130,17 @@ export async function buildCRMPayload(
       conversationSummary: 'Extraction failed or skipped.',
       recommendedService: 'Needs Manual Review',
       intentLevel: score > 50 ? 'High' : (score > 20 ? 'Medium' : 'Low') as 'Low' | 'Medium' | 'High',
+      escalationStatus: score > 50 ? 'Pending' : 'None' as 'None' | 'Pending' | 'Escalated',
+      meetingRequested: score > 50,
+      meetingType: score > 50 ? 'Discovery Call' : 'None' as 'Discovery Call' | 'None',
+      priority: score > 70 ? 'High' : (score > 40 ? 'Medium' : 'Low') as 'Low' | 'Medium' | 'High' | 'Critical',
+      followUpRecommendation: 'Review manually due to extraction failure.',
+      handoffReason: score > 50 ? 'High score manual fallback' : 'None',
     };
   }
 
   const qualificationStatus = score >= 70 ? 'Highly Qualified' : (score >= 40 ? 'Qualified' : 'Unqualified');
+  const assignedSalesStage = intelligence.meetingRequested ? 'Discovery' : 'New';
 
   return {
     leadInformation: {
@@ -142,6 +163,14 @@ export async function buildCRMPayload(
     recommendedService: intelligence.recommendedService,
     intentLevel: intelligence.intentLevel,
     qualificationStatus,
+    escalationStatus: intelligence.escalationStatus,
+    meetingRequested: intelligence.meetingRequested,
+    meetingType: intelligence.meetingType,
+    assignedSalesStage,
+    priority: intelligence.priority,
+    followUpRecommendation: intelligence.followUpRecommendation,
+    handoffReason: intelligence.handoffReason,
+    salesNotes: `System Generated: Lead score is ${score}. Intent is ${intelligence.intentLevel}.`,
     timestamp: new Date().toISOString(),
     sessionId,
   };
@@ -169,6 +198,9 @@ export async function processLeadForCRM(
   console.log(`Timeline: ${crmPayload.businessInformation.timeline}`);
   console.log(`Recommended Solution: ${crmPayload.recommendedService}`);
   console.log(`Lead Score: ${crmPayload.leadScore}`);
+  console.log(`Escalation: ${crmPayload.escalationStatus} (Reason: ${crmPayload.handoffReason})`);
+  console.log(`Meeting: ${crmPayload.meetingRequested ? crmPayload.meetingType : 'None'}`);
+  console.log(`Priority: ${crmPayload.priority}`);
   console.log('----------------------------------------');
 
   return crmPayload;

@@ -5,6 +5,7 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage, type TextUIPart } from 'ai';
 import { ChatMessage } from './ChatMessage';
 import { LeadFormModal } from './LeadFormModal';
+import { CalendarModal } from './CalendarModal';
 
 function getMessageText(message: UIMessage): string {
   return message.parts
@@ -73,6 +74,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [isLeadFormOpen, setIsLeadFormOpen] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [hasSubmittedLead, setHasSubmittedLead] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
@@ -189,6 +191,14 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
     // Mark lead as submitted successfully and persist it
     setHasSubmittedLead(true);
     localStorage.setItem('xaivon_chat_lead_submitted', 'true');
+    
+    // Phase 7: Transition to Human Handoff (Calendar)
+    setIsLeadFormOpen(false);
+    
+    // Give the lead form time to animate out before opening calendar
+    setTimeout(() => {
+      setIsCalendarOpen(true);
+    }, 400);
   };
 
   // Retry after error
@@ -367,6 +377,12 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
         isOpen={isLeadFormOpen}
         onClose={() => setIsLeadFormOpen(false)}
         onSubmit={handleLeadFormSubmit}
+      />
+
+      {/* ─── CALENDAR OVERLAY (inside chatbot) ─── */}
+      <CalendarModal
+        isOpen={isCalendarOpen}
+        onClose={() => setIsCalendarOpen(false)}
       />
     </div>
   );

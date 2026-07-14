@@ -452,7 +452,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
     }
     return (
       <>
-        Schedule Consultation
+        Submit & Continue
         <ArrowIcon />
       </>
     );
@@ -517,7 +517,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                 </div>
                 <p className="text-white font-semibold text-sm">Thank you!</p>
                 <p className="text-slate-400 text-xs mt-1">
-                  Our team will reach out soon.
+                  Taking you to the calendar...
                 </p>
               </div>
             ) : (
@@ -732,7 +732,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                   aria-label={
                     formStatus === 'submitting'
                       ? 'Submitting form'
-                      : 'Schedule consultation'
+                      : 'Submit & Continue'
                   }
                 >
                   {SubmitContent()}
