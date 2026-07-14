@@ -87,9 +87,9 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
         setFieldErrors({});
         onClose();
       }, 2500);
-    } catch {
+    } catch (err) {
       setFormStatus('error');
-      setErrorMessage('Submission failed. Please try again.');
+      setErrorMessage(err instanceof Error ? err.message : 'Submission failed. Please try again.');
     }
   };
 

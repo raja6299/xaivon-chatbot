@@ -28,84 +28,95 @@ async function getSupabaseClientSafe() {
 }
 
 export async function POST(req: Request) {
+  let currentStage = 'init';
   try {
+    // 1. Parsing
+    currentStage = 'parsing_request';
     const body = await req.json();
     const { fullName, email, company, phone, sessionId } = body;
 
+    // 2. Validation
+    currentStage = 'validation';
     if (!fullName || !email) {
-      console.error('[LEADS API] ERROR: Missing required fields');
-      return NextResponse.json(
-        { error: 'Full name and email are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ stage: currentStage, error: 'Full name and email are required' }, { status: 400 });
     }
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      console.error('[LEADS API] ERROR: Invalid email format:', email);
-      return NextResponse.json(
-        { error: 'Invalid email format' },
-        { status: 400 }
-      );
+      return NextResponse.json({ stage: currentStage, error: 'Invalid email format' }, { status: 400 });
     }
 
+    // 3. Supabase Client Init
+    currentStage = 'supabase_client_init';
     const supabase = await getSupabaseClientSafe();
 
-    if (supabase) {
-      const { data, error } = await supabase
-        .from('leads')
-        .insert([
-          {
-            full_name: fullName,
-            email: email,
-            company: company || null,
-            phone: phone || null,
-            session_id: sessionId || null,
-            status: 'new',
-          },
-        ])
-        .select();
-
-      if (error) {
-        console.error('[LEADS API] Supabase error:', error.message);
-        // If table doesn't exist, still return success with logged data
-        if (error.code === '42P01') {
-          console.warn('[LEADS API] Table "leads" does not exist. Lead logged to console.');
-          console.log('[LEADS API] Lead data:', { fullName, email, company, phone, sessionId });
-          return NextResponse.json({
-            success: true,
-            note: 'Lead received. Database table pending setup.',
-          });
-        }
-        // For duplicate email+session constraint violations, still succeed
-        if (error.code === '23505') {
-          return NextResponse.json({ success: true });
-        }
-        return NextResponse.json(
-          { error: 'Failed to save lead' },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({
-        success: true,
-        leadId: data?.[0]?.id,
-      });
-    } else {
-      // Supabase not configured — log and succeed gracefully
+    if (!supabase) {
+      currentStage = 'supabase_client_missing_graceful_fallback';
       console.warn('[LEADS API] Supabase not configured. Logging lead to server output.');
       console.log('[LEADS API] Lead data:', JSON.stringify({ fullName, email, company, phone, sessionId }));
       return NextResponse.json({
+        stage: currentStage,
         success: true,
         note: 'Lead received. Database connection pending configuration.',
       });
     }
 
+    // 4. Supabase Insert
+    currentStage = 'supabase_insert';
+    const insertPayload = {
+      full_name: fullName,
+      email: email,
+      company: company || null,
+      phone: phone || null,
+      session_id: sessionId || null,
+      status: 'new',
+    };
+
+    const { data, error } = await supabase
+      .from('leads')
+      .insert([insertPayload])
+      .select();
+
+    if (error) {
+      currentStage = 'supabase_insert_error';
+      
+      // If table doesn't exist, still return success with logged data
+      if (error.code === '42P01') {
+        console.warn('[LEADS API] Table "leads" does not exist. Lead logged to console.');
+        console.log('[LEADS API] Lead data:', insertPayload);
+        return NextResponse.json({
+          stage: currentStage,
+          success: true,
+          note: 'Lead received. Database table pending setup.',
+        });
+      }
+      
+      // For duplicate email+session constraint violations, still succeed
+      if (error.code === '23505') {
+        return NextResponse.json({ stage: currentStage, success: true });
+      }
+
+      return NextResponse.json({
+        stage: currentStage,
+        error: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        payload: insertPayload
+      }, { status: 500 });
+    }
+
+    // 5. Success Response
+    currentStage = 'response';
+    return NextResponse.json({
+      stage: currentStage,
+      success: true,
+      leadId: data?.[0]?.id,
+    });
+
   } catch (error) {
-    console.error('[LEADS API] FATAL ERROR:', error instanceof Error ? error.message : error);
-    return NextResponse.json(
-      { error: 'Failed to process request' },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      stage: currentStage,
+      error: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }
