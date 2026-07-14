@@ -23,7 +23,9 @@ const QUICK_SUGGESTIONS = [
 ];
 
 export function ChatWindow({ onClose }: { onClose: () => void }) {
-  const { messages, sendMessage, status, error } = useChat({
+  // Use a fixed generic ID for the chat instance to maintain state internally if needed
+  const { messages, sendMessage, status, error, setMessages } = useChat({
+    id: 'xaivon-persistent-chat',
     transport: new DefaultChatTransport({ api: '/api/chat' }),
   });
   const [input, setInput] = useState('');
@@ -45,19 +47,50 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
     }
   }, [messages, isLoading]);
 
-  // Create session on mount
+  // Load chat history & session on mount (Persistence)
   useEffect(() => {
-    const createSession = async () => {
+    // 1. Restore messages
+    try {
+      const storedMessages = localStorage.getItem('xaivon_chat_messages');
+      if (storedMessages) {
+        const parsed = JSON.parse(storedMessages);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      }
+    } catch {
+      // Ignore parse errors
+    }
+
+    // 2. Restore or create session
+    const initializeSession = async () => {
+      const storedSession = localStorage.getItem('xaivon_chat_session_id');
+      if (storedSession) {
+        setSessionId(storedSession);
+        return;
+      }
+      
       try {
         const response = await fetch('/api/sessions', { method: 'POST' });
         const data = await response.json();
-        if (data.sessionId) setSessionId(data.sessionId);
+        if (data.sessionId) {
+          setSessionId(data.sessionId);
+          localStorage.setItem('xaivon_chat_session_id', data.sessionId);
+        }
       } catch {
         // Session creation is non-critical
       }
     };
-    createSession();
-  }, []);
+    
+    initializeSession();
+  }, [setMessages]);
+
+  // Save chat history on change
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem('xaivon_chat_messages', JSON.stringify(messages));
+    }
+  }, [messages]);
 
   // Lead form trigger detection
   useEffect(() => {

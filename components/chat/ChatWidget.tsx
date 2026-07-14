@@ -1,14 +1,22 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ChatWindow } from './ChatWindow';
 
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const widgetRef = useRef<HTMLDivElement>(null);
+  const [hasMounted, setHasMounted] = useState(false);
 
-  // Close chat when clicking outside
+  // Lazy-mount: mount ChatWindow on first open, never unmount after that
+  useEffect(() => {
+    if (isOpen && !hasMounted) {
+      setHasMounted(true);
+    }
+  }, [isOpen, hasMounted]);
+
+  // Close chat when clicking outside (only hides, never destroys)
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (widgetRef.current && !widgetRef.current.contains(event.target as Node)) {
@@ -32,21 +40,26 @@ export function ChatWidget() {
 
   return (
     <div ref={widgetRef} className="fixed bottom-5 right-5 z-50">
-      {/* Chat Window */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: 16 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.92, y: 16 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-            className="absolute bottom-[72px] right-0 w-[380px] max-w-[calc(100vw-40px)] h-[min(580px,calc(100vh-120px))] rounded-2xl shadow-2xl shadow-black/40 border border-violet-500/15 overflow-hidden"
-            style={{ transformOrigin: 'bottom right' }}
-          >
-            <ChatWindow onClose={() => setIsOpen(false)} />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/*
+        Chat Window — always mounted once opened, never unmounts.
+        Uses motion.div animate (not AnimatePresence) so ChatWindow
+        component stays alive and useChat state is preserved.
+      */}
+      <motion.div
+        initial={false}
+        animate={
+          isOpen
+            ? { opacity: 1, scale: 1, y: 0 }
+            : { opacity: 0, scale: 0.92, y: 16 }
+        }
+        transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+        className={`absolute bottom-[72px] right-0 w-[380px] max-w-[calc(100vw-40px)] h-[min(580px,calc(100vh-120px))] rounded-2xl shadow-2xl shadow-black/40 border border-violet-500/15 overflow-hidden ${
+          !isOpen ? 'pointer-events-none' : ''
+        }`}
+        style={{ transformOrigin: 'bottom right' }}
+      >
+        {hasMounted && <ChatWindow onClose={() => setIsOpen(false)} />}
+      </motion.div>
 
       {/* Launcher Button */}
       <motion.button
@@ -65,34 +78,27 @@ export function ChatWidget() {
         `}
         aria-label={isOpen ? 'Close chat' : 'Open chat'}
       >
-        <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          animate={{ rotate: isOpen ? 0 : 0 }}
+          transition={{ duration: 0.15 }}
+        >
           {isOpen ? (
-            <motion.svg
-              key="close"
-              initial={{ rotate: -90, opacity: 0 }}
-              animate={{ rotate: 0, opacity: 1 }}
-              exit={{ rotate: 90, opacity: 0 }}
-              transition={{ duration: 0.15 }}
+            <svg
               className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </motion.svg>
+            </svg>
           ) : (
-            <motion.svg
-              key="chat"
-              initial={{ rotate: -90, opacity: 0 }}
-              animate={{ rotate: 0, opacity: 1 }}
-              exit={{ rotate: 90, opacity: 0 }}
-              transition={{ duration: 0.15 }}
+            <svg
               className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"
             >
               <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
               <circle cx="8" cy="10" r="1"/>
               <circle cx="12" cy="10" r="1"/>
               <circle cx="16" cy="10" r="1"/>
-            </motion.svg>
+            </svg>
           )}
-        </AnimatePresence>
+        </motion.div>
       </motion.button>
     </div>
   );
