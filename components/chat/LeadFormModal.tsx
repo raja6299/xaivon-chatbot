@@ -1,6 +1,10 @@
 "use client";
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface LeadFormData {
   fullName: string;
@@ -16,8 +20,198 @@ interface LeadFormModalProps {
 }
 
 type FormStatus = 'idle' | 'submitting' | 'success' | 'error';
+type FieldName = keyof LeadFormData;
+
+// ---------------------------------------------------------------------------
+// Validation helpers (pure functions – no external deps)
+// ---------------------------------------------------------------------------
+
+/** Strip HTML tags from a string */
+const stripHtml = (v: string): string => v.replace(/<[^>]*>/g, '');
+
+/** Sanitise a raw input value: trim + strip HTML */
+const sanitize = (v: string): string => stripHtml(v).trim();
+
+/** Count letter characters (any script) */
+const letterCount = (v: string): number => (v.match(/\p{L}/gu) ?? []).length;
+
+/** Check if string is purely digits */
+const isPureDigits = (v: string): boolean => /^\d+$/.test(v);
+
+/** Check if string is purely non-letter / non-digit symbols */
+const isPureSymbols = (v: string): boolean =>
+  v.length > 0 && !/\p{L}/u.test(v) && !/\d/.test(v);
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validateField(name: FieldName, raw: string): string {
+  const value = sanitize(raw);
+
+  switch (name) {
+    // ---- Full Name --------------------------------------------------------
+    case 'fullName': {
+      if (!value) return 'Name is required';
+      if (value.length < 2) return 'Name must be at least 2 characters';
+      if (value.length > 60) return 'Name must be at most 60 characters';
+      if (isPureDigits(value) || isPureSymbols(value) || letterCount(value) < 2)
+        return 'Please enter a valid name';
+      return '';
+    }
+
+    // ---- Email ------------------------------------------------------------
+    case 'email': {
+      if (!value) return 'Email is required';
+      if (!EMAIL_RE.test(value)) return 'Please enter a valid business email';
+      return '';
+    }
+
+    // ---- Company (NOW REQUIRED) -------------------------------------------
+    case 'company': {
+      if (!value) return 'Company name is required';
+      if (value.length < 2) return 'Company name must be at least 2 characters';
+      if (value.length > 100) return 'Company name must be at most 100 characters';
+      if (isPureDigits(value) || isPureSymbols(value) || letterCount(value) < 2)
+        return 'Please enter a valid company name';
+      return '';
+    }
+
+    // ---- Phone (optional) -------------------------------------------------
+    case 'phone': {
+      if (!value) return ''; // optional
+      // Strip everything except digits and leading +
+      const digits = value.replace(/[^\d]/g, '');
+      if (digits.length < 7 || digits.length > 15)
+        return 'Please enter a valid phone number (7-15 digits)';
+      // Reject all-same-digit spam like 1111111
+      if (/^(\d)\1+$/.test(digits))
+        return 'Please enter a valid phone number (7-15 digits)';
+      return '';
+    }
+
+    default:
+      return '';
+  }
+}
+
+/** Normalise phone for storage: keep + prefix if user provided it, digits only */
+function normalizePhone(raw: string): string {
+  const trimmed = sanitize(raw);
+  if (!trimmed) return '';
+  const hasPlus = trimmed.startsWith('+');
+  const digits = trimmed.replace(/[^\d]/g, '');
+  return hasPlus ? `+${digits}` : digits;
+}
+
+// ---------------------------------------------------------------------------
+// Inline SVG icons
+// ---------------------------------------------------------------------------
+
+function CheckIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#34d399"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  );
+}
+
+function ErrorXIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#f87171"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M18 6L6 18" />
+      <path d="M6 6l12 12" />
+    </svg>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M5 12h14" />
+      <path d="M12 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+function SpinnerIcon() {
+  return (
+    <svg
+      className="animate-spin h-4 w-4 text-white"
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
+  );
+}
+
+function SubmitCheckIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps) {
+  // -- Form state -----------------------------------------------------------
   const [formData, setFormData] = useState<LeadFormData>({
     fullName: '',
     email: '',
@@ -26,86 +220,257 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
   });
   const [formStatus, setFormStatus] = useState<FormStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof LeadFormData, string>>>({});
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({});
+  const [touched, setTouched] = useState<Partial<Record<FieldName, boolean>>>({});
 
-  const validateField = useCallback((name: keyof LeadFormData, value: string): string => {
-    switch (name) {
-      case 'fullName':
-        if (!value.trim()) return 'Name is required';
-        if (value.trim().length < 2) return 'Name must be at least 2 characters';
-        return '';
-      case 'email':
-        if (!value.trim()) return 'Email is required';
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Enter a valid email';
-        return '';
-      default:
-        return '';
-    }
-  }, []);
+  // -- Honeypot -------------------------------------------------------------
+  const [honeypot, setHoneypot] = useState('');
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    if (fieldErrors[name as keyof LeadFormData]) {
-      const error = validateField(name as keyof LeadFormData, value);
-      setFieldErrors(prev => ({ ...prev, [name]: error }));
-    }
-  };
+  // -- Anti-bot render timestamp --------------------------------------------
+  const renderTimestamp = useRef<number>(0);
 
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    const error = validateField(name as keyof LeadFormData, value);
-    setFieldErrors(prev => ({ ...prev, [name]: error }));
-  };
+  // -- Refs for focus management --------------------------------------------
+  const firstInputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   const handleClose = () => {
     setFormData({ fullName: '', email: '', company: '', phone: '' });
     setFormStatus('idle');
     setErrorMessage('');
     setFieldErrors({});
+    setTouched({});
+    setHoneypot('');
     onClose();
+  };
+
+  // -- Reset everything when modal opens/closes -----------------------------
+  useEffect(() => {
+    if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFormData({ fullName: '', email: '', company: '', phone: '' });
+      setFormStatus('idle');
+      setErrorMessage('');
+      setFieldErrors({});
+      setTouched({});
+      setHoneypot('');
+      renderTimestamp.current = Date.now();
+
+      // Focus first input after mount
+      requestAnimationFrame(() => {
+        firstInputRef.current?.focus();
+      });
+    }
+  }, [isOpen]);
+
+  // -- Escape key closes modal ----------------------------------------------
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && formStatus !== 'submitting') {
+        handleClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, formStatus]);
+
+  // -- Focus trap -----------------------------------------------------------
+  useEffect(() => {
+    if (!isOpen) return;
+    const modal = modalRef.current;
+    if (!modal) return;
+
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+
+      const focusable = modal.querySelectorAll<HTMLElement>(
+        'input:not([tabindex="-1"]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleTab);
+    return () => document.removeEventListener('keydown', handleTab);
+  }, [isOpen]);
+
+  // -- Handlers -------------------------------------------------------------
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    const field = name as FieldName;
+    setFormData((prev) => ({ ...prev, [field]: value }));
+
+    // Re-validate only if the field already has an error (reactive clear)
+    if (fieldErrors[field]) {
+      const error = validateField(field, value);
+      setFieldErrors((prev) => ({ ...prev, [field]: error }));
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    const field = name as FieldName;
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const error = validateField(field, value);
+    setFieldErrors((prev) => ({ ...prev, [field]: error }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
-    const errors: Partial<Record<keyof LeadFormData, string>> = {};
-    errors.fullName = validateField('fullName', formData.fullName);
-    errors.email = validateField('email', formData.email);
-    setFieldErrors(errors);
+    // -- Honeypot check (silently succeed) --------------------------------
+    if (honeypot) {
+      setFormStatus('success');
+      setTimeout(() => {
+        handleClose();
+      }, 2500);
+      return;
+    }
 
-    if (errors.fullName || errors.email) return;
+    // -- Speed check: if submitted within 2 s of render, silently succeed -
+    if (Date.now() - renderTimestamp.current < 2000) {
+      setFormStatus('success');
+      setTimeout(() => {
+        handleClose();
+      }, 2500);
+      return;
+    }
+
+    // -- Validate all fields ----------------------------------------------
+    const fields: FieldName[] = ['fullName', 'email', 'company', 'phone'];
+    const errors: Partial<Record<FieldName, string>> = {};
+    const nowTouched: Partial<Record<FieldName, boolean>> = {};
+
+    for (const field of fields) {
+      errors[field] = validateField(field, formData[field]);
+      nowTouched[field] = true;
+    }
+
+    setFieldErrors(errors);
+    setTouched(nowTouched);
+
+    if (errors.fullName || errors.email || errors.company || errors.phone) return;
+
+    // -- Sanitise & normalise data ----------------------------------------
+    const sanitizedData: LeadFormData = {
+      fullName: sanitize(formData.fullName),
+      email: sanitize(formData.email),
+      company: sanitize(formData.company),
+      phone: normalizePhone(formData.phone),
+    };
 
     setFormStatus('submitting');
     try {
-      await onSubmit(formData);
+      await onSubmit(sanitizedData);
       setFormStatus('success');
       setTimeout(() => {
-        setFormData({ fullName: '', email: '', company: '', phone: '' });
-        setFormStatus('idle');
-        setFieldErrors({});
-        onClose();
+        handleClose();
       }, 2500);
     } catch (err) {
       setFormStatus('error');
-      setErrorMessage(err instanceof Error ? err.message : 'Submission failed. Please try again.');
+      setErrorMessage(
+        err instanceof Error ? err.message : 'Submission failed. Please try again.',
+      );
     }
   };
 
+  // -- Derived helpers for inline validation icons --------------------------
+
+  /** Returns 'valid' | 'invalid' | null (not yet touched) */
+  const fieldState = (field: FieldName): 'valid' | 'invalid' | null => {
+    if (!touched[field]) return null;
+    if (fieldErrors[field]) return 'invalid';
+    // For optional phone, blank is neither valid nor invalid
+    if (field === 'phone' && !sanitize(formData[field])) return null;
+    return 'valid';
+  };
+
+  // -- Don't render if closed -----------------------------------------------
   if (!isOpen) return null;
 
-  return (
-    <div className="lead-form-overlay" role="dialog" aria-modal="true" aria-label="Consultation form">
-      <div className="w-full max-w-[340px] mx-3 animate-slide-up">
-        <div className="bg-[#111827]/95 border border-violet-500/20 rounded-2xl shadow-2xl shadow-violet-500/5 overflow-hidden">
+  // -- Input border class helper --------------------------------------------
+  const inputBorderClass = (field: FieldName): string => {
+    const state = fieldState(field);
+    if (state === 'invalid')
+      return 'border-red-500/50 focus:ring-1 focus:ring-red-500/30';
+    if (state === 'valid')
+      return 'border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20';
+    return 'border-violet-500/10 focus:border-violet-500/30 focus:ring-1 focus:ring-violet-500/20';
+  };
 
-          {/* Form Header */}
+  // -- Inline validation indicator ------------------------------------------
+  const ValidationIndicator = ({ field }: { field: FieldName }) => {
+    const state = fieldState(field);
+    if (!state) return null;
+    return (
+      <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+        {state === 'valid' ? <CheckIcon /> : <ErrorXIcon />}
+      </span>
+    );
+  };
+
+  // -- Submit button content ------------------------------------------------
+  const SubmitContent = () => {
+    if (formStatus === 'submitting') {
+      return (
+        <>
+          <SpinnerIcon />
+          Submitting...
+        </>
+      );
+    }
+    if (formStatus === 'success') {
+      return (
+        <>
+          <SubmitCheckIcon />
+          Submitted!
+        </>
+      );
+    }
+    return (
+      <>
+        Schedule Consultation
+        <ArrowIcon />
+      </>
+    );
+  };
+
+  return (
+    <div
+      className="lead-form-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Schedule a free consultation"
+    >
+      <div ref={modalRef} className="w-full max-w-[340px] mx-3 animate-slide-up">
+        <div className="bg-[#111827]/95 border border-violet-500/20 rounded-2xl shadow-2xl shadow-violet-500/5 overflow-hidden">
+          {/* ---- Header -------------------------------------------------- */}
           <div className="px-5 pt-5 pb-3 border-b border-violet-500/10">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-white font-semibold text-sm">Get Your Free Consultation</h2>
-                <p className="text-slate-400 text-[11px] mt-0.5">We&apos;ll get back to you within 24 hours.</p>
+                <h2 className="text-white font-semibold text-sm">
+                  Get Your Free Consultation
+                </h2>
+                <p className="text-slate-400 text-[11px] mt-0.5">
+                  We&apos;ll get back to you within 24 hours.
+                </p>
               </div>
               <button
                 onClick={handleClose}
@@ -113,139 +478,258 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                 className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all duration-200 disabled:opacity-40"
                 aria-label="Close form"
               >
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                  <path
+                    d="M1 1l10 10M11 1L1 11"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
               </button>
             </div>
           </div>
 
-          {/* Form Body */}
+          {/* ---- Body ---------------------------------------------------- */}
           <div className="px-5 py-4 max-h-[55vh] overflow-y-auto scrollbar-thin">
             {formStatus === 'success' ? (
               <div className="text-center py-6 animate-fade-in-up">
                 <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center mb-3">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#34d399"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
                 </div>
                 <p className="text-white font-semibold text-sm">Thank you!</p>
-                <p className="text-slate-400 text-xs mt-1">Our team will reach out soon.</p>
+                <p className="text-slate-400 text-xs mt-1">
+                  Our team will reach out soon.
+                </p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>
-                {/* Full Name */}
+                {/* ---- Honeypot (hidden anti-bot) ---- */}
+                <input
+                  type="text"
+                  name="website"
+                  value={honeypot}
+                  onChange={(e) => setHoneypot(e.target.value)}
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    left: '-9999px',
+                    opacity: 0,
+                    height: 0,
+                    width: 0,
+                  }}
+                />
+
+                {/* ---- Full Name ---- */}
                 <div>
-                  <label htmlFor="lead-fullName" className="block text-xs font-medium text-slate-300 mb-1.5">
+                  <label
+                    htmlFor="lead-fullName"
+                    className="block text-xs font-medium text-slate-300 mb-1.5"
+                  >
                     Full Name <span className="text-violet-400">*</span>
                   </label>
-                  <input
-                    id="lead-fullName"
-                    type="text"
-                    name="fullName"
-                    value={formData.fullName}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    disabled={formStatus === 'submitting'}
-                    placeholder="John Smith"
-                    className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 placeholder-slate-600 transition-all duration-200 outline-none border ${
-                      fieldErrors.fullName
-                        ? 'border-red-500/50 focus:ring-1 focus:ring-red-500/30'
-                        : 'border-violet-500/10 focus:border-violet-500/30 focus:ring-1 focus:ring-violet-500/20'
-                    } disabled:opacity-40`}
-                    autoComplete="name"
-                  />
+                  <div className="relative">
+                    <input
+                      ref={firstInputRef}
+                      id="lead-fullName"
+                      type="text"
+                      name="fullName"
+                      value={formData.fullName}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      disabled={formStatus === 'submitting'}
+                      placeholder="John Smith"
+                      maxLength={60}
+                      className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 pr-9 placeholder-slate-600 transition-all duration-200 outline-none border ${inputBorderClass('fullName')} disabled:opacity-40`}
+                      autoComplete="name"
+                      aria-required="true"
+                      aria-invalid={fieldState('fullName') === 'invalid' || undefined}
+                      aria-describedby={
+                        fieldErrors.fullName ? 'lead-fullName-error' : undefined
+                      }
+                    />
+                    {ValidationIndicator({ field: 'fullName' })}
+                  </div>
                   {fieldErrors.fullName && (
-                    <p className="text-red-400 text-[10px] mt-1 ml-1">{fieldErrors.fullName}</p>
+                    <p
+                      id="lead-fullName-error"
+                      role="alert"
+                      className="text-red-400 text-[10px] mt-1 ml-1"
+                    >
+                      {fieldErrors.fullName}
+                    </p>
                   )}
                 </div>
 
-                {/* Email */}
+                {/* ---- Email ---- */}
                 <div>
-                  <label htmlFor="lead-email" className="block text-xs font-medium text-slate-300 mb-1.5">
+                  <label
+                    htmlFor="lead-email"
+                    className="block text-xs font-medium text-slate-300 mb-1.5"
+                  >
                     Email <span className="text-violet-400">*</span>
                   </label>
-                  <input
-                    id="lead-email"
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    disabled={formStatus === 'submitting'}
-                    placeholder="john@company.com"
-                    className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 placeholder-slate-600 transition-all duration-200 outline-none border ${
-                      fieldErrors.email
-                        ? 'border-red-500/50 focus:ring-1 focus:ring-red-500/30'
-                        : 'border-violet-500/10 focus:border-violet-500/30 focus:ring-1 focus:ring-violet-500/20'
-                    } disabled:opacity-40`}
-                    autoComplete="email"
-                  />
+                  <div className="relative">
+                    <input
+                      id="lead-email"
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      disabled={formStatus === 'submitting'}
+                      placeholder="john@company.com"
+                      className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 pr-9 placeholder-slate-600 transition-all duration-200 outline-none border ${inputBorderClass('email')} disabled:opacity-40`}
+                      autoComplete="email"
+                      aria-required="true"
+                      aria-invalid={fieldState('email') === 'invalid' || undefined}
+                      aria-describedby={
+                        fieldErrors.email ? 'lead-email-error' : undefined
+                      }
+                    />
+                    {ValidationIndicator({ field: 'email' })}
+                  </div>
                   {fieldErrors.email && (
-                    <p className="text-red-400 text-[10px] mt-1 ml-1">{fieldErrors.email}</p>
+                    <p
+                      id="lead-email-error"
+                      role="alert"
+                      className="text-red-400 text-[10px] mt-1 ml-1"
+                    >
+                      {fieldErrors.email}
+                    </p>
                   )}
                 </div>
 
-                {/* Company */}
+                {/* ---- Company ---- */}
                 <div>
-                  <label htmlFor="lead-company" className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Company
+                  <label
+                    htmlFor="lead-company"
+                    className="block text-xs font-medium text-slate-300 mb-1.5"
+                  >
+                    Company <span className="text-violet-400">*</span>
                   </label>
-                  <input
-                    id="lead-company"
-                    type="text"
-                    name="company"
-                    value={formData.company}
-                    onChange={handleChange}
-                    disabled={formStatus === 'submitting'}
-                    placeholder="Acme Inc."
-                    className="w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 placeholder-slate-600 transition-all duration-200 outline-none border border-violet-500/10 focus:border-violet-500/30 focus:ring-1 focus:ring-violet-500/20 disabled:opacity-40"
-                    autoComplete="organization"
-                  />
+                  <div className="relative">
+                    <input
+                      id="lead-company"
+                      type="text"
+                      name="company"
+                      value={formData.company}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      disabled={formStatus === 'submitting'}
+                      placeholder="Acme Inc."
+                      maxLength={100}
+                      className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 pr-9 placeholder-slate-600 transition-all duration-200 outline-none border ${inputBorderClass('company')} disabled:opacity-40`}
+                      autoComplete="organization"
+                      aria-required="true"
+                      aria-invalid={fieldState('company') === 'invalid' || undefined}
+                      aria-describedby={
+                        fieldErrors.company ? 'lead-company-error' : undefined
+                      }
+                    />
+                    {ValidationIndicator({ field: 'company' })}
+                  </div>
+                  {fieldErrors.company && (
+                    <p
+                      id="lead-company-error"
+                      role="alert"
+                      className="text-red-400 text-[10px] mt-1 ml-1"
+                    >
+                      {fieldErrors.company}
+                    </p>
+                  )}
                 </div>
 
-                {/* Phone */}
+                {/* ---- Phone ---- */}
                 <div>
-                  <label htmlFor="lead-phone" className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Phone
+                  <label
+                    htmlFor="lead-phone"
+                    className="block text-xs font-medium text-slate-300 mb-1.5"
+                  >
+                    Phone{' '}
+                    <span className="text-slate-500 text-[10px] font-normal">
+                      (optional)
+                    </span>
                   </label>
-                  <input
-                    id="lead-phone"
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    disabled={formStatus === 'submitting'}
-                    placeholder="+1 (555) 000-0000"
-                    className="w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 placeholder-slate-600 transition-all duration-200 outline-none border border-violet-500/10 focus:border-violet-500/30 focus:ring-1 focus:ring-violet-500/20 disabled:opacity-40"
-                    autoComplete="tel"
-                  />
+                  <div className="relative">
+                    <input
+                      id="lead-phone"
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      disabled={formStatus === 'submitting'}
+                      placeholder="+1 (555) 000-0000"
+                      className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 pr-9 placeholder-slate-600 transition-all duration-200 outline-none border ${inputBorderClass('phone')} disabled:opacity-40`}
+                      autoComplete="tel"
+                      aria-invalid={fieldState('phone') === 'invalid' || undefined}
+                      aria-describedby={
+                        fieldErrors.phone ? 'lead-phone-error' : undefined
+                      }
+                    />
+                    {ValidationIndicator({ field: 'phone' })}
+                  </div>
+                  {fieldErrors.phone && (
+                    <p
+                      id="lead-phone-error"
+                      role="alert"
+                      className="text-red-400 text-[10px] mt-1 ml-1"
+                    >
+                      {fieldErrors.phone}
+                    </p>
+                  )}
                 </div>
 
-                {/* Error */}
+                {/* ---- Global error ---- */}
                 {formStatus === 'error' && (
-                  <div className="flex items-center gap-2 bg-red-900/20 border border-red-500/20 rounded-xl px-3 py-2.5 animate-fade-in-up">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+                  <div
+                    className="flex items-center gap-2 bg-red-900/20 border border-red-500/20 rounded-xl px-3 py-2.5 animate-fade-in-up"
+                    role="alert"
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#f87171"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M15 9l-6 6M9 9l6 6" />
+                    </svg>
                     <span className="text-red-300 text-xs">{errorMessage}</span>
                   </div>
                 )}
 
-                {/* Submit */}
+                {/* ---- Submit ---- */}
                 <button
                   type="submit"
                   disabled={formStatus === 'submitting'}
-                  className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-medium text-sm py-2.5 rounded-xl transition-all duration-200 shadow-lg shadow-violet-500/15 hover:shadow-violet-500/25 disabled:opacity-50 disabled:hover:from-violet-600 disabled:hover:to-purple-600 flex items-center justify-center gap-2"
+                  className={`w-full font-medium text-sm py-2.5 rounded-xl transition-all duration-200 shadow-lg flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white shadow-violet-500/15 hover:shadow-violet-500/25 disabled:opacity-50 disabled:hover:from-violet-600 disabled:hover:to-purple-600`}
+                  aria-label={
+                    formStatus === 'submitting'
+                      ? 'Submitting form'
+                      : 'Schedule consultation'
+                  }
                 >
-                  {formStatus === 'submitting' ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Submitting...
-                    </>
-                  ) : (
-                    <>
-                      Schedule Consultation
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
-                    </>
-                  )}
+                  {SubmitContent()}
                 </button>
               </form>
             )}

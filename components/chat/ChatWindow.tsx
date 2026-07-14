@@ -66,6 +66,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
     // 2. Restore lead submission state
     const leadSubmitted = localStorage.getItem('xaivon_chat_lead_submitted');
     if (leadSubmitted === 'true') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHasSubmittedLead(true);
     }
 
