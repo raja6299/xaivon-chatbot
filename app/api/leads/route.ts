@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
+import { isValidPhoneNumber } from 'libphonenumber-js';
+
 // Rate limiting: simple in-memory store (resets on cold start, sufficient for serverless)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
@@ -87,65 +89,46 @@ export async function POST(req: Request) {
 
     // Server-side validation — NEVER trust client
 
-    // Name: required, 2-60 chars, must contain at least 2 letters
+    // Name: required, 2-60 chars, letters/spaces/hyphens/apostrophes
+    const NAME_RE = /^[a-zA-Z\s\-']+$/;
     if (!fullName) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Please enter your full name.' }, { status: 400 });
     }
     if (fullName.length < 2 || fullName.length > 60) {
-      return NextResponse.json(
-        { error: 'Name must be between 2 and 60 characters' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Name must be between 2 and 60 characters.' }, { status: 400 });
     }
-    if (!hasMinLetters(fullName, 2)) {
-      return NextResponse.json({ error: 'Please enter a valid name' }, { status: 400 });
+    if (!NAME_RE.test(fullName) || !hasMinLetters(fullName, 2)) {
+      return NextResponse.json({ error: 'Please enter a valid name.' }, { status: 400 });
     }
 
     // Email: required, valid format
     if (!email) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Please enter your email address.' }, { status: 400 });
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json({ error: 'Please enter a valid business email' }, { status: 400 });
+    const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
+    if (!EMAIL_RE.test(email.toLowerCase())) {
+      return NextResponse.json({ error: 'Please enter a valid business email.' }, { status: 400 });
     }
+    const cleanEmail = email.toLowerCase();
 
     // Company: required, 2-100 chars, must contain at least 2 letters
     if (!company) {
-      return NextResponse.json({ error: 'Company name is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Please enter your company name.' }, { status: 400 });
     }
     if (company.length < 2 || company.length > 100) {
-      return NextResponse.json(
-        { error: 'Company name must be between 2 and 100 characters' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Company name must be between 2 and 100 characters.' }, { status: 400 });
     }
     if (!hasMinLetters(company, 2)) {
-      return NextResponse.json({ error: 'Please enter a valid company name' }, { status: 400 });
+      return NextResponse.json({ error: 'Please enter a valid company name.' }, { status: 400 });
     }
 
-    // Phone: optional, but if provided must be 7-15 digits
+    // Phone: optional, strict international validation
     let cleanPhone: string | null = null;
     if (phone) {
-      const hasPlus = phone.startsWith('+');
-      const digitsOnly = phone.replace(/\D/g, '');
-
-      if (digitsOnly.length < 7 || digitsOnly.length > 15) {
-        return NextResponse.json(
-          { error: 'Please enter a valid phone number (7-15 digits)' },
-          { status: 400 }
-        );
+      if (!isValidPhoneNumber(phone)) {
+        return NextResponse.json({ error: 'Please enter a valid international phone number.' }, { status: 400 });
       }
-
-      // Check for repeating single digit (e.g. 1111111)
-      if (/^(\d)\1+$/.test(digitsOnly)) {
-        return NextResponse.json(
-          { error: 'Please enter a valid phone number' },
-          { status: 400 }
-        );
-      }
-
-      cleanPhone = hasPlus ? `+${digitsOnly}` : digitsOnly;
+      cleanPhone = phone.trim();
     }
 
     // Supabase Client Init
@@ -158,7 +141,7 @@ export async function POST(req: Request) {
     // Insert (matches exact live schema)
     const insertPayload = {
       name: fullName,
-      email: email,
+      email: cleanEmail,
       company: company,
       phone: cleanPhone,
       session_id: sessionId || null,

@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,7 +44,8 @@ const isPureDigits = (v: string): boolean => /^\d+$/.test(v);
 const isPureSymbols = (v: string): boolean =>
   v.length > 0 && !/\p{L}/u.test(v) && !/\d/.test(v);
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const NAME_RE = /^[a-zA-Z\s\-']+$/;
+const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
 
 function validateField(name: FieldName, raw: string): string {
   const value = sanitize(raw);
@@ -50,41 +53,36 @@ function validateField(name: FieldName, raw: string): string {
   switch (name) {
     // ---- Full Name --------------------------------------------------------
     case 'fullName': {
-      if (!value) return 'Name is required';
-      if (value.length < 2) return 'Name must be at least 2 characters';
-      if (value.length > 60) return 'Name must be at most 60 characters';
+      if (!value) return 'Please enter your full name.';
+      if (value.length < 2) return 'Name must contain at least two letters.';
+      if (value.length > 60) return 'Name is too long (maximum 60 characters).';
+      if (!NAME_RE.test(value)) return 'Name can only contain letters, spaces, hyphens, and apostrophes.';
       if (isPureDigits(value) || isPureSymbols(value) || letterCount(value) < 2)
-        return 'Please enter a valid name';
+        return 'Please enter a valid name.';
       return '';
     }
 
     // ---- Email ------------------------------------------------------------
     case 'email': {
-      if (!value) return 'Email is required';
-      if (!EMAIL_RE.test(value)) return 'Please enter a valid business email';
+      if (!value) return 'Please enter your email address.';
+      if (!EMAIL_RE.test(value)) return 'Please enter a valid business email.';
       return '';
     }
 
     // ---- Company (NOW REQUIRED) -------------------------------------------
     case 'company': {
-      if (!value) return 'Company name is required';
-      if (value.length < 2) return 'Company name must be at least 2 characters';
-      if (value.length > 100) return 'Company name must be at most 100 characters';
+      if (!value) return 'Please enter your company name.';
+      if (value.length < 2) return 'Company name looks incomplete.';
+      if (value.length > 100) return 'Company name is too long (maximum 100 characters).';
       if (isPureDigits(value) || isPureSymbols(value) || letterCount(value) < 2)
-        return 'Please enter a valid company name';
+        return 'Please enter a valid company name.';
       return '';
     }
 
     // ---- Phone (optional) -------------------------------------------------
     case 'phone': {
-      if (!value) return ''; // optional
-      // Strip everything except digits and leading +
-      const digits = value.replace(/[^\d]/g, '');
-      if (digits.length < 7 || digits.length > 15)
-        return 'Please enter a valid phone number (7-15 digits)';
-      // Reject all-same-digit spam like 1111111
-      if (/^(\d)\1+$/.test(digits))
-        return 'Please enter a valid phone number (7-15 digits)';
+      if (!raw) return ''; // optional
+      if (!isValidPhoneNumber(raw)) return 'Please enter a valid international phone number.';
       return '';
     }
 
@@ -93,13 +91,10 @@ function validateField(name: FieldName, raw: string): string {
   }
 }
 
-/** Normalise phone for storage: keep + prefix if user provided it, digits only */
+/** Normalise phone for storage: keep E.164 format */
 function normalizePhone(raw: string): string {
-  const trimmed = sanitize(raw);
-  if (!trimmed) return '';
-  const hasPlus = trimmed.startsWith('+');
-  const digits = trimmed.replace(/[^\d]/g, '');
-  return hasPlus ? `+${digits}` : digits;
+  // react-phone-number-input already gives us E.164 formatting
+  return raw ? raw.trim() : '';
 }
 
 // ---------------------------------------------------------------------------
@@ -316,11 +311,22 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
     const field = name as FieldName;
     setFormData((prev) => ({ ...prev, [field]: value }));
 
-    // Re-validate only if the field already has an error (reactive clear)
-    if (fieldErrors[field]) {
-      const error = validateField(field, value);
-      setFieldErrors((prev) => ({ ...prev, [field]: error }));
-    }
+    // Live validation while typing for enterprise UX
+    const error = validateField(field, value);
+    setFieldErrors((prev) => ({ ...prev, [field]: error }));
+  };
+
+  const handlePhoneChange = (value?: string) => {
+    const val = value || '';
+    setFormData((prev) => ({ ...prev, phone: val }));
+    const error = validateField('phone', val);
+    setFieldErrors((prev) => ({ ...prev, phone: error }));
+  };
+
+  const handlePhoneBlur = () => {
+    setTouched((prev) => ({ ...prev, phone: true }));
+    const error = validateField('phone', formData.phone);
+    setFieldErrors((prev) => ({ ...prev, phone: error }));
   };
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -666,16 +672,16 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                     </span>
                   </label>
                   <div className="relative">
-                    <input
+                    <PhoneInput
                       id="lead-phone"
-                      type="tel"
                       name="phone"
                       value={formData.phone}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
+                      onChange={handlePhoneChange}
+                      onBlur={handlePhoneBlur}
                       disabled={formStatus === 'submitting'}
                       placeholder="+1 (555) 000-0000"
-                      className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 pr-9 placeholder-slate-600 transition-all duration-200 outline-none border ${inputBorderClass('phone')} disabled:opacity-40`}
+                      defaultCountry="US"
+                      className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2 pr-9 placeholder-slate-600 transition-all duration-200 outline-none border ${inputBorderClass('phone')} disabled:opacity-40 [&_.PhoneInputCountryIcon]:w-6 [&_.PhoneInputCountryIcon]:h-4 [&_.PhoneInputCountryIcon--border]:border-none [&_.PhoneInputInput]:bg-transparent [&_.PhoneInputInput]:outline-none [&_.PhoneInputInput]:text-white`}
                       autoComplete="tel"
                       aria-invalid={fieldState('phone') === 'invalid' || undefined}
                       aria-describedby={
