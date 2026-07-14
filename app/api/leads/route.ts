@@ -3,33 +3,7 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 
 import { isValidPhoneNumber } from 'libphonenumber-js';
-
-// Rate limiting: simple in-memory store (resets on cold start, sufficient for serverless)
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 5; // 5 submissions per minute per IP
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const record = rateLimitMap.get(ip);
-
-  if (!record || now > record.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return false;
-  }
-
-  record.count++;
-  if (record.count > RATE_LIMIT_MAX_REQUESTS) {
-    return true;
-  }
-
-  return false;
-}
-
-function sanitize(value: unknown): string {
-  if (typeof value !== 'string') return '';
-  return value.trim().replace(/<[^>]*>/g, '').slice(0, 500);
-}
+import { checkRateLimit, sanitizeInput, leadRequestSchema, logAnalytics, logSecurity } from '@/lib/security';
 
 function hasMinLetters(value: string, min: number): boolean {
   const letters = value.replace(/[^a-zA-Z\u00C0-\u024F\u0400-\u04FF]/g, '');
@@ -62,32 +36,55 @@ async function getSupabaseClientSafe() {
 
 export async function POST(req: Request) {
   try {
-    // Rate limiting by IP
+    // 1. Rate Limiting (Sliding Window: 5 requests per minute per IP)
     const forwarded = req.headers.get('x-forwarded-for');
     const ip = forwarded?.split(',')[0]?.trim() || 'unknown';
 
-    if (isRateLimited(ip)) {
+    const rateLimit = checkRateLimit(`leads_${ip}`, 5, 60_000);
+    if (!rateLimit.success) {
+      logSecurity('RateLimitExceeded', { ip, endpoint: '/api/leads' });
       return NextResponse.json(
         { error: 'Too many requests. Please try again in a minute.' },
-        { status: 429 }
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': String(rateLimit.retryAfter || 60)
+          }
+        }
       );
     }
 
-    const body = await req.json();
+    // 2. Validate and Sanitize Input using Zod
+    let rawBody;
+    try {
+      rawBody = await req.json();
+    } catch {
+      logSecurity('InvalidJSON', { ip });
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
 
-    // Honeypot check: if website field is filled, silently succeed
+    const validationResult = leadRequestSchema.safeParse(rawBody);
+    if (!validationResult.success) {
+      logSecurity('ValidationError', { ip, errors: validationResult.error.format() });
+      return NextResponse.json({ error: 'Invalid request format or oversized payload' }, { status: 400 });
+    }
+
+    const body = validationResult.data;
+
+    // 3. Honeypot check: if website field is filled, silently succeed
     if (body.website) {
+      logSecurity('HoneypotTriggered', { ip, field: 'website' });
       return NextResponse.json({ success: true });
     }
 
-    // Sanitize all inputs
-    const fullName = sanitize(body.fullName);
-    const email = sanitize(body.email);
-    const company = sanitize(body.company);
-    const phone = sanitize(body.phone);
-    const sessionId = sanitize(body.sessionId);
+    // 4. Sanitize all inputs
+    const fullName = sanitizeInput(body.fullName);
+    const email = sanitizeInput(body.email);
+    const company = sanitizeInput(body.company);
+    const phone = body.phone ? sanitizeInput(body.phone) : '';
+    const sessionId = body.sessionId ? sanitizeInput(body.sessionId) : '';
 
-    // Server-side validation — NEVER trust client
+    // Server-side logical validation — NEVER trust client
 
     // Name: required, 2-60 chars, letters/spaces/hyphens/apostrophes
     const NAME_RE = /^[a-zA-Z\s\-']+$/;
@@ -135,7 +132,30 @@ export async function POST(req: Request) {
     const supabase = await getSupabaseClientSafe();
 
     if (!supabase) {
+      logSecurity('MissingSupabase', { endpoint: '/api/leads' });
       return NextResponse.json({ error: 'Database connection not configured' }, { status: 500 });
+    }
+
+    // 5. Duplicate Lead Detection
+    let orQuery = `email.eq.${cleanEmail},company.eq.${company}`;
+    if (cleanPhone) {
+      orQuery += `,phone.eq.${cleanPhone}`;
+    }
+
+    try {
+      const { data: existingLead } = await supabase
+        .from('leads')
+        .select('id')
+        .or(orQuery)
+        .limit(1);
+
+      if (existingLead && existingLead.length > 0) {
+        logAnalytics('DuplicateLeadPrevented', { email: cleanEmail, company });
+        return NextResponse.json({ success: true, note: 'You\'re already in touch with our team.' });
+      }
+    } catch (dbError) {
+      logSecurity('SupabaseError', { action: 'DuplicateCheck', error: String(dbError) });
+      // Proceed gracefully even if duplicate check fails
     }
 
     // Insert (matches exact live schema)
@@ -172,16 +192,24 @@ export async function POST(req: Request) {
         const { processLeadForCRM } = await import('@/lib/crm');
         await processLeadForCRM(body, body.messages, sessionId);
       } catch (crmError) {
-        console.error('CRM Processing Error:', crmError);
+        logSecurity('CRMProcessingError', { error: String(crmError) });
       }
     }
+
+    logAnalytics('LeadSubmitted', { 
+      ip, 
+      company,
+      hasPhone: !!cleanPhone,
+      timestamp: new Date().toISOString()
+    });
 
     return NextResponse.json({
       success: true,
       leadId: data?.[0]?.id,
     });
 
-  } catch {
+  } catch (error) {
+    logSecurity('ServerError', { endpoint: '/api/leads', error: String(error) });
     return NextResponse.json(
       { error: 'An unexpected error occurred while processing your request' },
       { status: 500 }

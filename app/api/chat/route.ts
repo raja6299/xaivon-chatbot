@@ -1,6 +1,7 @@
 import { groq } from '@ai-sdk/groq';
 import { streamText, convertToModelMessages } from 'ai';
 import { knowledgeBase } from '@/lib/knowledge-base';
+import { checkRateLimit, sanitizeInput, chatRequestSchema, logAnalytics, logSecurity } from '@/lib/security';
 
 const SYSTEM_PROMPT = `You are XAIVON's Enterprise Solutions Consultant — a knowledgeable, professional AI assistant embedded on the XAIVON website.
 
@@ -111,32 +112,83 @@ ${knowledgeBase.competitiveAdvantages.map((a: string) => `- ${a}`).join('\n')}
 
 export async function POST(req: Request) {
   try {
+    // 1. Rate Limiting (Sliding Window: 10 requests per minute per IP)
+    const forwarded = req.headers.get('x-forwarded-for');
+    const ip = forwarded?.split(',')[0]?.trim() || 'unknown';
+    const rateLimit = checkRateLimit(`chat_${ip}`, 10, 60_000);
+    
+    if (!rateLimit.success) {
+      logSecurity('RateLimitExceeded', { ip, endpoint: '/api/chat' });
+      return new Response(
+        JSON.stringify({ error: 'Too many requests. Please try again later.' }),
+        { 
+          status: 429, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Retry-After': String(rateLimit.retryAfter || 60)
+          } 
+        }
+      );
+    }
+
     if (!process.env.GROQ_API_KEY) {
+      logSecurity('MissingAPIKey', { service: 'Groq' });
       return new Response(
         JSON.stringify({ error: 'Service temporarily unavailable. Please try again later.' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    const { messages } = await req.json();
-
-    if (!messages || !Array.isArray(messages)) {
+    // 2. Validate and Sanitize Input using Zod
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      logSecurity('InvalidJSON', { ip });
       return new Response(
-        JSON.stringify({ error: 'Invalid request format' }),
+        JSON.stringify({ error: 'Invalid request body' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
+    const validationResult = chatRequestSchema.safeParse(body);
+    if (!validationResult.success) {
+      logSecurity('ValidationError', { ip, errors: validationResult.error.format() });
+      return new Response(
+        JSON.stringify({ error: 'Invalid request format or oversized payload' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { messages } = validationResult.data;
+
+    // Sanitize message content to prevent prompt injection and XSS
+    const sanitizedMessages = messages.map(m => {
+      if (typeof m === 'object' && m !== null && typeof m.content === 'string') {
+        return { ...m, content: sanitizeInput(m.content) };
+      }
+      return m;
+    });
+
+    // 3. Analytics
+    logAnalytics('ChatInitiated', { 
+      ip, 
+      messageCount: sanitizedMessages.length,
+      timestamp: new Date().toISOString() 
+    });
+
+    // 4. AI Stream
     const response = await streamText({
       model: groq('llama-3.3-70b-versatile'),
       system: SYSTEM_PROMPT,
-      messages: await convertToModelMessages(messages),
+      messages: await convertToModelMessages(sanitizedMessages),
       temperature: 0.7,
     });
 
     return response.toUIMessageStreamResponse();
 
-  } catch {
+  } catch (error) {
+    logSecurity('ServerError', { endpoint: '/api/chat', error: String(error) });
     return new Response(
       JSON.stringify({ error: 'Something went wrong. Please try again.' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
