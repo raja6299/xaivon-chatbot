@@ -7,6 +7,9 @@ export class VoiceManager {
   private state: VoiceState = 'idle';
   private speechQueue: string[] = [];
   
+  private silenceTimer: NodeJS.Timeout | null = null;
+  private currentText: string = '';
+  
   // Listeners
   private stateListeners: Set<(state: VoiceState) => void> = new Set();
   private settingsListeners: Set<(settings: VoiceSettings) => void> = new Set();
@@ -59,7 +62,7 @@ export class VoiceManager {
 
   // --- STT (Input) ---
 
-  async startListening() {
+  async startListening(prefixText: string = '') {
     if (!this.provider.isSupported) {
       this.errorListeners.forEach(l => l('Voice not supported on this browser.'));
       return;
@@ -70,18 +73,35 @@ export class VoiceManager {
 
     this.setState('permission_request');
     
+    // Make sure prefix text ends with a space if it's not empty
+    const prefix = prefixText.trim() ? prefixText.trim() + ' ' : '';
+    
     await this.provider.startListening(
       (text, isFinal) => {
         this.setState('recognizing');
-        this.textListeners.forEach(l => l(text, isFinal));
+        this.currentText = prefix + text;
+        this.textListeners.forEach(l => l(this.currentText, false)); // Emit as interim
+
+        // Reset silence timeout on every new text
+        if (this.silenceTimer) clearTimeout(this.silenceTimer);
+        this.silenceTimer = setTimeout(() => {
+          // Silence detected: auto-submit
+          this.stopListening();
+        }, 2500); // 2.5 seconds of silence triggers submission
       },
       (err) => {
         this.setState('error');
         this.errorListeners.forEach(l => l(err));
+        if (this.silenceTimer) clearTimeout(this.silenceTimer);
       },
       () => {
         if (this.state === 'recognizing' || this.state === 'listening') {
           this.setState('idle');
+          if (this.silenceTimer) clearTimeout(this.silenceTimer);
+          if (this.currentText) {
+            this.textListeners.forEach(l => l(this.currentText, true));
+            this.currentText = '';
+          }
         }
       }
     );
@@ -92,11 +112,26 @@ export class VoiceManager {
   }
 
   stopListening() {
+    if (this.silenceTimer) {
+      clearTimeout(this.silenceTimer);
+      this.silenceTimer = null;
+    }
     this.provider.stopListening();
     this.setState('idle');
+    
+    // Emit the final accumulated text to trigger submission
+    if (this.currentText) {
+      this.textListeners.forEach(l => l(this.currentText, true));
+      this.currentText = '';
+    }
   }
 
   abortListening() {
+    if (this.silenceTimer) {
+      clearTimeout(this.silenceTimer);
+      this.silenceTimer = null;
+    }
+    this.currentText = '';
     this.provider.abortListening();
     this.setState('idle');
   }

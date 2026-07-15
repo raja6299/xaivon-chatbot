@@ -423,6 +423,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
             <VoiceRecorder 
               onTranscription={handleTranscription} 
               disabled={isLoading || isLeadFormOpen}
+              initialText={input}
             />
           </div>
         </form>

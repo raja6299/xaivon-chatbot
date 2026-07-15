@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getVoiceManager } from '../lib/voice/VoiceManager';
 import { VoiceState, VoiceSettings } from '../lib/voice/types';
 
-export function useVoice() {
+export function useVoice(onResult?: (text: string, isFinal: boolean) => void) {
   const manager = getVoiceManager();
   
   const [state, setState] = useState<VoiceState>(manager.getState());
@@ -17,8 +17,11 @@ export function useVoice() {
     const unsubError = manager.subscribeToError((err) => setError(err));
     const unsubText = manager.subscribeToText((text, isFinal) => {
       setInterimText(text);
+      if (onResult) {
+        onResult(text, isFinal);
+      }
       if (isFinal) {
-        // Reset interim when final arrives, allowing parent component to handle it
+        // Reset interim when final arrives
         setTimeout(() => setInterimText(''), 50);
       }
     });
@@ -29,12 +32,12 @@ export function useVoice() {
       unsubError();
       unsubText();
     };
-  }, [manager]);
+  }, [manager, onResult]);
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback((prefixText: string = '') => {
     setError(null);
     setInterimText('');
-    manager.startListening();
+    manager.startListening(prefixText);
   }, [manager]);
 
   const stopListening = useCallback(() => {

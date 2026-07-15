@@ -14,6 +14,7 @@ export class WebSpeechProvider implements VoiceProvider {
         this.recognition = new SpeechRecognitionConstructor();
         this.recognition.continuous = true;
         this.recognition.interimResults = true;
+        this.recognition.lang = 'en-IN'; // Better for mixed Hindi-English (Hinglish)
       }
       this.synthesis = window.speechSynthesis;
     }
@@ -51,21 +52,23 @@ export class WebSpeechProvider implements VoiceProvider {
     }
 
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interimTranscript = '';
       let finalTranscript = '';
+      let interimTranscript = '';
 
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
+      // Accumulate ALL results from the beginning of the continuous session
+      for (let i = 0; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
+          finalTranscript += event.results[i][0].transcript + ' ';
         } else {
           interimTranscript += event.results[i][0].transcript;
         }
       }
 
-      if (finalTranscript) {
-        onResult(finalTranscript, true);
-      } else if (interimTranscript) {
-        onResult(interimTranscript, false);
+      const fullText = (finalTranscript + interimTranscript).trim();
+      if (fullText) {
+        // We pass false for isFinal because in continuous mode, we don't want to 
+        // prematurely trigger submission on every sentence boundary.
+        onResult(fullText, false);
       }
     };
 

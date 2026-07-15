@@ -1,27 +1,20 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useVoice } from '../../hooks/useVoice';
 import { Mic, Square, Loader2 } from 'lucide-react';
 
 interface VoiceRecorderProps {
   onTranscription: (text: string, isFinal: boolean) => void;
   disabled?: boolean;
+  initialText?: string;
 }
 
-export function VoiceRecorder({ onTranscription, disabled }: VoiceRecorderProps) {
+export function VoiceRecorder({ onTranscription, disabled, initialText = '' }: VoiceRecorderProps) {
   const { 
     isSupported, 
     state, 
     startListening, 
-    stopListening, 
-    interimText 
-  } = useVoice();
-
-  // Feed text back to parent
-  useEffect(() => {
-    if (state === 'recognizing' || state === 'listening') {
-      onTranscription(interimText, false);
-    }
-  }, [interimText, state, onTranscription]);
+    stopListening 
+  } = useVoice(onTranscription);
 
   if (!isSupported) {
     return null; // Don't show mic if totally unsupported
@@ -33,12 +26,8 @@ export function VoiceRecorder({ onTranscription, disabled }: VoiceRecorderProps)
     e.preventDefault();
     if (isRecording) {
       stopListening();
-      // On stop, if there is interim text, finalize it
-      if (interimText) {
-        onTranscription(interimText, true);
-      }
     } else {
-      startListening();
+      startListening(initialText);
     }
   };
 
