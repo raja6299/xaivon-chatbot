@@ -3,6 +3,8 @@ import { streamText, convertToModelMessages } from 'ai';
 import { knowledgeBase } from '@/lib/knowledge-base';
 import { checkRateLimit, sanitizeInput, chatRequestSchema, logAnalytics, logSecurity } from '@/lib/security';
 import { RAGManager } from '@/lib/rag/RAGManager';
+import { z } from 'zod';
+import { integrations } from '@/lib/integrations/manager';
 
 const SYSTEM_PROMPT = `You are XAIVON's Enterprise Solutions Consultant — a knowledgeable, professional AI assistant embedded on the XAIVON website.
 
@@ -24,6 +26,14 @@ const SYSTEM_PROMPT = `You are XAIVON's Enterprise Solutions Consultant — a kn
 ## DYNAMIC GREETINGS
 - If the user says "Hi", "Hello", "Good morning", or "How are you?", reply differently and naturally every time.
 - Avoid repeating identical greetings. Keep it brief (1-2 lines) and welcoming.
+
+## MULTI-LANGUAGE INTELLIGENCE & LOCALIZATION
+- You are a global Enterprise AI Consultant.
+- Automatically detect the user's language (English, Hindi, Roman Hindi, Hinglish, etc.).
+- ALWAYS respond natively and naturally in the exact same language and tone used by the user.
+- If the user switches languages during the conversation, you must switch with them immediately.
+- If the internal Knowledge Base or CRM context is in English, but the user is speaking Hindi, you must seamlessly translate and answer the user in Hindi.
+- Do NOT mix languages randomly. If the user speaks Hinglish (mixed), reply in Hinglish. If pure Hindi, pure Hindi. If pure English, pure English.
 
 ## GENERAL KNOWLEDGE
 If the user asks a question unrelated to XAIVON (e.g., "What is the capital of Australia?", math, science, translation, coding):
@@ -224,6 +234,45 @@ export async function POST(req: Request) {
       system: finalSystemPrompt,
       messages: await convertToModelMessages(sanitizedMessages),
       temperature: 0.7,
+      tools: {
+        sendSlackNotification: {
+          description: 'Send a message to the internal Slack team to notify them of an important event, high-value lead, or support request.',
+          parameters: z.object({
+            message: z.string().describe('The notification message to send to Slack.'),
+          }),
+          execute: async ({ message }) => {
+            console.log('Tool call: sendSlackNotification');
+            const jobId = integrations.trigger('slack', { message });
+            return { success: true, message: 'Slack notification triggered asynchronously in the background', jobId };
+          },
+        },
+        syncHubSpotCRM: {
+          description: 'Create or update a contact in HubSpot CRM.',
+          parameters: z.object({
+            email: z.string().email(),
+            firstName: z.string().optional(),
+            lastName: z.string().optional(),
+            company: z.string().optional(),
+          }),
+          execute: async (contactDetails) => {
+            console.log('Tool call: syncHubSpotCRM');
+            const jobId = integrations.trigger('hubspot', contactDetails);
+            return { success: true, message: 'CRM sync triggered asynchronously in the background', jobId };
+          },
+        },
+        triggerZapierWebhook: {
+          description: 'Trigger a custom Zapier workflow via Webhook.',
+          parameters: z.object({
+            url: z.string().url().describe('The Zapier Webhook URL'),
+            data: z.record(z.any()).describe('The JSON payload to send to Zapier'),
+          }),
+          execute: async ({ url, data }) => {
+            console.log('Tool call: triggerZapierWebhook');
+            const jobId = integrations.trigger('webhook', { url, method: 'POST', data });
+            return { success: true, message: 'Zapier workflow triggered asynchronously in the background', jobId };
+          },
+        }
+      },
     });
 
     return response.toUIMessageStreamResponse();

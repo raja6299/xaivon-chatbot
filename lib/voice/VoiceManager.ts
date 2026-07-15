@@ -28,7 +28,7 @@ export class VoiceManager {
         if (saved) {
           this.settings = { ...this.settings, ...JSON.parse(saved) };
         }
-      } catch (_e) {
+      } catch {
         // ignore
       }
     }
@@ -77,7 +77,8 @@ export class VoiceManager {
     const prefix = prefixText.trim() ? prefixText.trim() + ' ' : '';
     
     await this.provider.startListening(
-      (text, isFinal) => {
+      this.settings,
+      (text: string) => {
         this.setState('recognizing');
         this.currentText = prefix + text;
         this.textListeners.forEach(l => l(this.currentText, false)); // Emit as interim

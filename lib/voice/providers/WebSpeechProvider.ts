@@ -14,7 +14,6 @@ export class WebSpeechProvider implements VoiceProvider {
         this.recognition = new SpeechRecognitionConstructor();
         this.recognition.continuous = true;
         this.recognition.interimResults = true;
-        this.recognition.lang = 'en-IN'; // Better for mixed Hindi-English (Hinglish)
       }
       this.synthesis = window.speechSynthesis;
     }
@@ -27,6 +26,7 @@ export class WebSpeechProvider implements VoiceProvider {
   // --- Input (STT) ---
   
   async startListening(
+    settings: VoiceSettings,
     onResult: (text: string, isFinal: boolean) => void,
     onError: (error: string) => void,
     onEnd: () => void
@@ -35,6 +35,9 @@ export class WebSpeechProvider implements VoiceProvider {
       onError('Speech recognition not supported in this browser.');
       return;
     }
+    
+    // Dynamically set language from settings (or fallback to en-IN for Hinglish support)
+    this.recognition.lang = settings.language || 'en-IN';
 
     try {
       // Request microphone permissions explicitly to handle errors gracefully
@@ -84,7 +87,7 @@ export class WebSpeechProvider implements VoiceProvider {
 
     try {
       this.recognition.start();
-    } catch (_e) {
+    } catch {
       // Ignore if already started
     }
   }

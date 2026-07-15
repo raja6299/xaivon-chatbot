@@ -12,6 +12,8 @@ import { FileUploader } from './FileUploader';
 import { AttachmentCard } from './AttachmentCard';
 import { useVoice } from '../../hooks/useVoice';
 import { useFiles } from '../../hooks/useFiles';
+import { useTranslation } from '../../lib/i18n';
+import { Language } from '../../lib/i18n/types';
 
 function getMessageText(message: UIMessage): string {
   return message.parts
@@ -84,13 +86,24 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
   const [hasSubmittedLead, setHasSubmittedLead] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const { t, language, setLanguage } = useTranslation();
 
   // File Management
   const { files, isProcessing, addFiles, removeFile, clearFiles, retryFile } = useFiles();
 
   // Voice integration
-  const { speak, stopOutput } = useVoice();
+  const { speak, stopOutput, updateSettings } = useVoice();
   const prevIsLoading = useRef<boolean>(false);
+
+  // Sync voice language with UI language preference
+  useEffect(() => {
+    let voiceLang = 'en-IN'; // Default to en-IN for Hinglish/Auto
+    if (language === 'hi') voiceLang = 'hi-IN';
+    else if (language === 'en') voiceLang = 'en-US';
+    
+    updateSettings({ language: voiceLang });
+  }, [language, updateSettings]);
 
   const isLoading = status === 'submitted' || status === 'streaming';
 
@@ -343,16 +356,50 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
               <p className="text-violet-300/50 text-[10px] font-medium leading-tight">AI Solutions Consultant</p>
             </div>
           </div>
-          <button
-            onClick={() => {
-              stopOutput();
-              onClose();
-            }}
-            className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all duration-200"
-            aria-label="Close chat"
-          >
-            <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          </button>
+          <div className="flex items-center gap-1">
+            <div className="relative">
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all duration-200"
+                aria-label="Settings"
+                title={t('chat.settings')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+              
+              {showSettings && (
+                <div className="absolute right-0 top-10 w-48 bg-[#151d35] border border-violet-500/20 rounded-xl shadow-xl z-50 overflow-hidden animate-fade-in-up origin-top-right">
+                  <div className="px-3 py-2 border-b border-white/5">
+                    <p className="text-xs font-semibold text-white">{t('settings.title')}</p>
+                  </div>
+                  <div className="py-1">
+                    {(['auto', 'en', 'hi', 'hinglish'] as Language[]).map(lang => (
+                      <button
+                        key={lang}
+                        onClick={() => {
+                          setLanguage(lang);
+                          setShowSettings(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs transition-colors ${language === lang ? 'bg-violet-500/20 text-violet-300' : 'text-slate-300 hover:bg-white/5'}`}
+                      >
+                        {t(`settings.${lang}`)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => {
+                stopOutput();
+                onClose();
+              }}
+              className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all duration-200"
+              aria-label={t('settings.close')}
+            >
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -371,7 +418,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
               <div>
                 <p className="text-white font-semibold text-[15px]">Welcome to XAIVON</p>
                 <p className="text-slate-400 text-xs mt-1 leading-relaxed max-w-[240px] mx-auto">
-                  AI infrastructure for enterprises that scale. How can I help you today?
+                  {t('chat.greeting')}
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-2 pt-1">
@@ -496,7 +543,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
                   e.currentTarget.form?.requestSubmit();
                 }
               }}
-              placeholder="Ask about our AI solutions..."
+              placeholder={t('chat.placeholder')}
               disabled={isLoading || isLeadFormOpen}
               rows={1}
               className="flex-1 px-3.5 py-2.5 bg-[#151d35] text-white text-sm rounded-xl placeholder-slate-500 disabled:opacity-30 focus:outline-none focus:ring-1 focus:ring-violet-500/40 border border-violet-500/8 focus:border-violet-500/25 transition-all duration-200 resize-none"

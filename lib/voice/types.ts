@@ -32,6 +32,7 @@ export interface VoiceProvider {
   
   // Input
   startListening(
+    settings: VoiceSettings,
     onResult: (text: string, isFinal: boolean) => void,
     onError: (error: string) => void,
     onEnd: () => void

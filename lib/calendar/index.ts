@@ -6,7 +6,8 @@ export interface CalendarAdapter {
 export class CalendlyAdapter implements CalendarAdapter {
   provider = 'Calendly';
 
-  generateBookingUrl(_meetingType?: string, prefillData?: Record<string, unknown>): string {
+  generateBookingUrl(meetingType?: string, prefillData?: Record<string, unknown>): string {
+    void meetingType;
     // Mock implementation for Calendly
     const baseUrl = 'https://calendly.com/xaivon/discovery';
     const params = new URLSearchParams();
@@ -24,7 +25,7 @@ export class CalendlyAdapter implements CalendarAdapter {
 export class GoogleCalendarAdapter implements CalendarAdapter {
   provider = 'Google Calendar';
 
-  generateBookingUrl(_meetingType?: string, _prefillData?: Record<string, unknown>): string {
+  generateBookingUrl(): string {
     // Mock implementation for Google Appointment Scheduling
     return `https://calendar.google.com/calendar/appointments/schedules/xaivon-mock-id`;
   }
@@ -33,7 +34,7 @@ export class GoogleCalendarAdapter implements CalendarAdapter {
 export class OutlookAdapter implements CalendarAdapter {
   provider = 'Outlook Bookings';
 
-  generateBookingUrl(_meetingType?: string, _prefillData?: Record<string, unknown>): string {
+  generateBookingUrl(): string {
     // Mock implementation for MS Bookings
     return `https://outlook.office365.com/owa/calendar/xaivon@mock.com/bookings/`;
   }
@@ -42,7 +43,7 @@ export class OutlookAdapter implements CalendarAdapter {
 export class ManualBookingAdapter implements CalendarAdapter {
   provider = 'Manual';
 
-  generateBookingUrl(_meetingType?: string, _prefillData?: Record<string, unknown>): string {
+  generateBookingUrl(): string {
     return 'manual'; // Frontend interprets this as "Show success message, we will email you"
   }
 }

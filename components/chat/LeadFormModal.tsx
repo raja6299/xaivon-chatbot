@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
+import { useTranslation } from '../../lib/i18n';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -183,29 +184,15 @@ function SpinnerIcon() {
   );
 }
 
-function SubmitCheckIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M20 6L9 17l-5-5" />
-    </svg>
-  );
-}
+
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps) {
+  const { t } = useTranslation();
+
   // -- Form state -----------------------------------------------------------
   const [formData, setFormData] = useState<LeadFormData>({
     fullName: '',
@@ -432,31 +419,6 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
     );
   };
 
-  // -- Submit button content ------------------------------------------------
-  const SubmitContent = () => {
-    if (formStatus === 'submitting') {
-      return (
-        <>
-          <SpinnerIcon />
-          Submitting...
-        </>
-      );
-    }
-    if (formStatus === 'success') {
-      return (
-        <>
-          <SubmitCheckIcon />
-          Submitted!
-        </>
-      );
-    }
-    return (
-      <>
-        Submit & Continue
-        <ArrowIcon />
-      </>
-    );
-  };
 
   return (
     <div
@@ -472,7 +434,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-white font-semibold text-sm">
-                  Get Your Free Consultation
+                  {t('form.title')}
                 </h2>
                 <p className="text-slate-400 text-[11px] mt-0.5">
                   We&apos;ll get back to you within 24 hours.
@@ -515,10 +477,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                     <path d="M20 6L9 17l-5-5" />
                   </svg>
                 </div>
-                <p className="text-white font-semibold text-sm">Thank you!</p>
-                <p className="text-slate-400 text-xs mt-1">
-                  Taking you to the calendar...
-                </p>
+                <p className="text-white font-semibold text-sm">{t('form.success')}</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>
@@ -546,7 +505,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                     htmlFor="lead-fullName"
                     className="block text-xs font-medium text-slate-300 mb-1.5"
                   >
-                    Full Name <span className="text-violet-400">*</span>
+                    {t('form.name')} <span className="text-violet-400">*</span>
                   </label>
                   <div className="relative">
                     <input
@@ -587,7 +546,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                     htmlFor="lead-email"
                     className="block text-xs font-medium text-slate-300 mb-1.5"
                   >
-                    Email <span className="text-violet-400">*</span>
+                    {t('form.email')} <span className="text-violet-400">*</span>
                   </label>
                   <div className="relative">
                     <input
@@ -626,7 +585,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                     htmlFor="lead-company"
                     className="block text-xs font-medium text-slate-300 mb-1.5"
                   >
-                    Company <span className="text-violet-400">*</span>
+                    {t('form.company')} <span className="text-violet-400">*</span>
                   </label>
                   <div className="relative">
                     <input
@@ -666,10 +625,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                     htmlFor="lead-phone"
                     className="block text-xs font-medium text-slate-300 mb-1.5"
                   >
-                    Phone{' '}
-                    <span className="text-slate-500 text-[10px] font-normal">
-                      (optional)
-                    </span>
+                    {t('form.phone')}
                   </label>
                   <div className="relative">
                     <PhoneInput
@@ -732,10 +688,20 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                   aria-label={
                     formStatus === 'submitting'
                       ? 'Submitting form'
-                      : 'Submit & Continue'
+                      : t('form.submit')
                   }
                 >
-                  {SubmitContent()}
+                  {formStatus === 'submitting' ? (
+                    <>
+                      <SpinnerIcon />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      {t('form.submit')}
+                      <ArrowIcon />
+                    </>
+                  )}
                 </button>
               </form>
             )}
