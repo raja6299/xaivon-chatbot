@@ -144,6 +144,8 @@ function prepareConversationContext<T>(messages: T[]): T[] {
 }
 
 export async function POST(req: Request) {
+  const requestId = `XAIVON-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
   try {
     // 1. Rate Limiting (Sliding Window: 10 requests per minute per IP)
     const forwarded = req.headers.get('x-forwarded-for');
@@ -287,12 +289,26 @@ export async function POST(req: Request) {
           },
         }
       },
+      onError: (err) => {
+        let errorMessage = 'Streaming Error';
+        const errString = String(err).toLowerCase();
+        if (errString.includes('rate limit') || errString.includes('429')) {
+          errorMessage = 'Rate Limit Exceeded. Please try again later.';
+        } else if (errString.includes('context_length_exceeded') || errString.includes('too large') || errString.includes('413')) {
+          errorMessage = 'Context Too Large. Please start a new conversation.';
+        } else if (errString.includes('timeout') || errString.includes('abort')) {
+          errorMessage = 'Request Timeout. Please try again.';
+        } else if (errString.includes('fetch failed') || errString.includes('network')) {
+          errorMessage = 'Network Error. Please check your connection.';
+        } else if (errString.includes('api key')) {
+          errorMessage = 'API Key Error. Please verify your configuration.';
+        }
+        logSecurity('StreamError', { requestId, error: errorMessage, raw: errString });
+      }
     });
 
     return response.toUIMessageStreamResponse();
-
   } catch (error) {
-    const requestId = `XAIVON-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     let errorMessage = 'Server Error';
     let statusCode = 500;
     const errString = String(error).toLowerCase();

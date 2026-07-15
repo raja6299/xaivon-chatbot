@@ -596,8 +596,18 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
               onChange={(e) => {
                 setInput(e.target.value);
                 setChatViewState('ACTIVE');
-                e.target.style.height = 'auto';
-                e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+                
+                // Optimize auto-resize to prevent unnecessary DOM reflows
+                const el = e.target;
+                const currentHeight = el.style.height;
+                el.style.height = '44px';
+                const newHeight = `${Math.min(el.scrollHeight, 200)}px`;
+                if (currentHeight !== newHeight) {
+                  el.style.height = newHeight;
+                } else {
+                  el.style.height = currentHeight;
+                }
+
                 // Full duplex: typing interrupts voice
                 if (e.target.value.trim().length > 0) {
                   stopOutput();
