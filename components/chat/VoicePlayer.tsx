@@ -16,12 +16,19 @@ export function VoicePlayer() {
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const randomHeights = [10, 14, 8, 12];
 
-  // Close speed menu when clicking outside (simple approach: close on any click)
+  // Close speed menu when clicking outside or pressing Escape
   useEffect(() => {
     if (showSpeedMenu) {
       const clickHandler = () => setShowSpeedMenu(false);
+      const keyHandler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setShowSpeedMenu(false);
+      };
       document.addEventListener('click', clickHandler);
-      return () => document.removeEventListener('click', clickHandler);
+      document.addEventListener('keydown', keyHandler);
+      return () => {
+        document.removeEventListener('click', clickHandler);
+        document.removeEventListener('keydown', keyHandler);
+      };
     }
   }, [showSpeedMenu]);
 
@@ -40,7 +47,7 @@ export function VoicePlayer() {
         {/* Play/Pause */}
         <button
           onClick={isPaused ? resumeOutput : pauseOutput}
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-violet-500/20 text-violet-300 hover:bg-violet-500/30 hover:text-white transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-violet-500/20 text-violet-300 hover:bg-violet-500/30 hover:text-white focus:outline-none focus:ring-1 focus:ring-violet-500/50 transition-colors"
           aria-label={isPaused ? "Resume voice" : "Pause voice"}
         >
           {isPaused ? <Play className="w-4 h-4 ml-0.5" /> : <Pause className="w-4 h-4" />}
@@ -49,7 +56,7 @@ export function VoicePlayer() {
         {/* Stop */}
         <button
           onClick={stopOutput}
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 focus:outline-none focus:ring-1 focus:ring-red-500/50 transition-colors"
           aria-label="Stop voice"
         >
           <Square className="w-3.5 h-3.5 fill-current" />
@@ -77,19 +84,27 @@ export function VoicePlayer() {
             e.stopPropagation();
             setShowSpeedMenu(!showSpeedMenu);
           }}
-          className="flex items-center gap-1 text-[10px] font-medium text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 px-2 py-1.5 rounded-lg transition-colors"
+          aria-label="Adjust voice speed"
+          aria-expanded={showSpeedMenu}
+          aria-haspopup="true"
+          className="flex items-center gap-1 text-[10px] font-medium text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 focus:outline-none focus:ring-1 focus:ring-violet-500/50 px-2 py-1.5 rounded-lg transition-colors"
         >
           <FastForward className="w-3 h-3" />
           {currentSpeed}x
         </button>
 
         {showSpeedMenu && (
-          <div className="absolute bottom-full right-8 mb-2 py-1 bg-[#151d35] border border-violet-500/20 rounded-lg shadow-xl overflow-hidden z-50">
+          <div 
+            className="absolute bottom-full right-8 mb-2 py-1 bg-[#151d35] border border-violet-500/20 rounded-lg shadow-xl overflow-hidden z-50"
+            role="menu"
+            aria-label="Voice speed options"
+          >
             {[0.75, 1.0, 1.25, 1.5, 2.0].map(speed => (
               <button
                 key={speed}
+                role="menuitem"
                 onClick={() => updateSettings({ playbackSpeed: speed })}
-                className={`w-full text-left px-4 py-1.5 text-xs hover:bg-violet-500/20 transition-colors ${currentSpeed === speed ? 'text-white bg-violet-500/10' : 'text-slate-400'}`}
+                className={`w-full text-left px-4 py-1.5 text-xs hover:bg-violet-500/20 focus:outline-none focus:bg-violet-500/30 transition-colors ${currentSpeed === speed ? 'text-white bg-violet-500/10' : 'text-slate-400'}`}
               >
                 {speed}x
               </button>
@@ -100,7 +115,7 @@ export function VoicePlayer() {
         {/* Mute/Unmute */}
         <button
           onClick={() => updateSettings({ isMuted: !isMuted })}
-          className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+          className={`w-8 h-8 flex items-center justify-center rounded-lg focus:outline-none focus:ring-1 focus:ring-violet-500/50 transition-colors ${
             isMuted ? 'text-slate-500 hover:text-slate-300 hover:bg-white/5' : 'text-violet-300 hover:text-white bg-violet-500/10 hover:bg-violet-500/20'
           }`}
           aria-label={isMuted ? "Unmute voice" : "Mute voice"}

@@ -119,12 +119,31 @@ export class WebSpeechProvider implements VoiceProvider {
     utterance.rate = settings.playbackSpeed;
     utterance.lang = settings.language;
 
+    let selectedVoice = null;
+    const voices = this.synthesis.getVoices();
+
     if (settings.preferredVoiceURI) {
-      const voices = this.synthesis.getVoices();
-      const voice = voices.find(v => v.voiceURI === settings.preferredVoiceURI);
-      if (voice) {
-        utterance.voice = voice;
-      }
+      selectedVoice = voices.find(v => v.voiceURI === settings.preferredVoiceURI);
+    }
+    
+    if (!selectedVoice && voices.length > 0) {
+      const isEnglish = (v: SpeechSynthesisVoice) => v.lang.toLowerCase().startsWith('en');
+      const isHindi = (v: SpeechSynthesisVoice) => v.lang.toLowerCase().startsWith('hi');
+      
+      const findBest = (filterFn: (v: SpeechSynthesisVoice) => boolean) => {
+        const filtered = voices.filter(filterFn);
+        return filtered.find(v => v.name.includes('Natural')) ||
+               filtered.find(v => v.name.includes('Google')) ||
+               filtered.find(v => v.name.includes('Microsoft')) ||
+               filtered.find(v => v.default) ||
+               filtered[0];
+      };
+
+      selectedVoice = findBest(isEnglish) || findBest(isHindi) || voices[0];
+    }
+
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
     }
 
     utterance.onstart = onStart;

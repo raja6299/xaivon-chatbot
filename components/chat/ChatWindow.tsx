@@ -159,10 +159,12 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
       !isLeadFormOpen &&
       !hasSubmittedLead
     ) {
+      // Full Duplex Interruption: Stop voice when form auto-opens
+      stopOutput();
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsLeadFormOpen(true);
     }
-  }, [messages, isLeadFormOpen, hasSubmittedLead]);
+  }, [messages, isLeadFormOpen, hasSubmittedLead, stopOutput]);
 
   // TTS Trigger: when loading finishes and last message is assistant
   useEffect(() => {
@@ -269,7 +271,10 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => {
+              stopOutput();
+              onClose();
+            }}
             className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all duration-200"
             aria-label="Close chat"
           >
@@ -386,7 +391,13 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
             <textarea
               ref={inputRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                // Full duplex: typing interrupts voice
+                if (e.target.value.trim().length > 0) {
+                  stopOutput();
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -423,14 +434,20 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
       {/* ─── LEAD FORM OVERLAY (inside chatbot) ─── */}
       <LeadFormModal
         isOpen={isLeadFormOpen}
-        onClose={() => setIsLeadFormOpen(false)}
+        onClose={() => {
+          stopOutput();
+          setIsLeadFormOpen(false);
+        }}
         onSubmit={handleLeadFormSubmit}
       />
 
       {/* ─── CALENDAR OVERLAY (inside chatbot) ─── */}
       <CalendarModal
         isOpen={isCalendarOpen}
-        onClose={() => setIsCalendarOpen(false)}
+        onClose={() => {
+          stopOutput();
+          setIsCalendarOpen(false);
+        }}
       />
     </div>
   );

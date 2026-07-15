@@ -104,22 +104,31 @@ export class VoiceManager {
   // --- TTS (Output) ---
 
   private cleanSpeechText(rawText: string): string {
-    // Smart Speech: Remove code blocks, markdown tables, JSON, URLs
     let text = rawText;
     
-    // Replace code blocks with placeholder
+    // Replace code blocks and JSON
     if (text.includes('```')) {
-       text = text.replace(/```[\s\S]*?```/g, ' I have shared the detailed technical information in the chat. ');
+       text = text.replace(/```[\s\S]*?```/g, ' I have shared the details in the chat. ');
     }
     
     // Replace URLs
-    text = text.replace(/https?:\/\/[^\s]+/g, ' this link ');
+    text = text.replace(/https?:\/\/[^\s]+/g, 'this link');
 
-    // Strip markdown bold/italics
-    text = text.replace(/(\*\*|__)(.*?)\1/g, '$2');
-    text = text.replace(/(\*|_)(.*?)\1/g, '$2');
+    // Strip HTML tags
+    text = text.replace(/<[^>]*>?/gm, '');
 
-    return text.trim();
+    // Strip Markdown tables (very basic: lines with multiple |)
+    text = text.replace(/\|.*\|/g, '');
+
+    // Strip Brackets, Parentheses (but careful not to remove standard punctuation)
+    // Actually, user said: Never read: Markdown, #, *, **, _, [], (), URLs, JSON, Code blocks, HTML, Tables, Emojis, Backticks
+    text = text.replace(/[\[\]\(\)#*_`]/g, '');
+
+    // Remove Emojis (matching emoji ranges)
+    text = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}]/gu, '');
+
+    // Remove extra whitespace
+    return text.replace(/\s{2,}/g, ' ').trim();
   }
 
   speakResponse(rawText: string) {
