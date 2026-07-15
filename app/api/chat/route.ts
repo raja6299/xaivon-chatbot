@@ -132,6 +132,17 @@ ${knowledgeBase.competitiveAdvantages.map((a: string) => `- ${a}`).join('\n')}
 - If asked something outside your knowledge, say: "That's a great question — I'd recommend speaking directly with our team for the most accurate answer. Would you like to schedule a quick call?"
 - Always be helpful, professional, and solution-oriented.`;
 
+// Helper to manage context window and prevent token overflow
+// Structured modularly so a formal Token Budget Manager can be plugged in later.
+function prepareConversationContext<T>(messages: T[]): T[] {
+  // Step 1: Temporary protection - Keep only the recent conversation
+  const MAX_HISTORY = 10;
+  if (messages.length > MAX_HISTORY) {
+    return messages.slice(-MAX_HISTORY);
+  }
+  return messages;
+}
+
 export async function POST(req: Request) {
   try {
     // 1. Rate Limiting (Sliding Window: 10 requests per minute per IP)
@@ -229,10 +240,13 @@ export async function POST(req: Request) {
 
     const finalSystemPrompt = SYSTEM_PROMPT + ragContext;
 
+    // 6. Modular Context Management (Prevent Token Overflow)
+    const contextSafeMessages = prepareConversationContext(sanitizedMessages);
+
     const response = await streamText({
       model: groq(modelId),
       system: finalSystemPrompt,
-      messages: await convertToModelMessages(sanitizedMessages),
+      messages: await convertToModelMessages(contextSafeMessages),
       temperature: 0.7,
       tools: {
         sendSlackNotification: {
@@ -278,10 +292,32 @@ export async function POST(req: Request) {
     return response.toUIMessageStreamResponse();
 
   } catch (error) {
-    logSecurity('ServerError', { endpoint: '/api/chat', error: String(error) });
+    const requestId = `XAIVON-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    let errorMessage = 'Server Error';
+    let statusCode = 500;
+    const errString = String(error).toLowerCase();
+    
+    if (errString.includes('rate limit') || errString.includes('429')) {
+      errorMessage = 'Rate Limit Exceeded. Please try again later.';
+      statusCode = 429;
+    } else if (errString.includes('context_length_exceeded') || errString.includes('too large') || errString.includes('413')) {
+      errorMessage = 'Context Too Large. Please start a new conversation.';
+      statusCode = 413;
+    } else if (errString.includes('timeout') || errString.includes('abort')) {
+      errorMessage = 'Request Timeout. Please try again.';
+      statusCode = 504;
+    } else if (errString.includes('fetch failed') || errString.includes('network')) {
+      errorMessage = 'Network Error. Please check your connection.';
+      statusCode = 502;
+    } else if (errString.includes('tool')) {
+      errorMessage = 'Integration Tool Failure.';
+    }
+
+    logSecurity('ServerError', { endpoint: '/api/chat', requestId, errorMessage, error: String(error) });
+
     return new Response(
-      JSON.stringify({ error: 'Something went wrong. Please try again.' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: `${errorMessage} (Request ID: ${requestId})` }),
+      { status: statusCode, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }

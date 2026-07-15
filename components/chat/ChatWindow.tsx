@@ -77,6 +77,9 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
     id: 'xaivon-persistent-chat',
     transport: new DefaultChatTransport({ api: '/api/chat' }),
   });
+  
+  type ChatViewState = 'WELCOME' | 'ACTIVE';
+  const [chatViewState, setChatViewState] = useState<ChatViewState>('WELCOME');
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -242,6 +245,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
   const handleQuickSuggestion = useCallback((text: string) => {
     if (isLoading) return;
     stopOutput();
+    setChatViewState('ACTIVE');
     sendMessage({ text });
   }, [isLoading, sendMessage, stopOutput]);
 
@@ -286,12 +290,16 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
 
   const handleTranscription = useCallback((text: string, isFinal: boolean) => {
     if (text) setInput(text);
+    setChatViewState('ACTIVE');
     if (isFinal && text.trim() && !isLoading) {
-       setTimeout(() => {
-         onSubmit();
-       }, 50);
+       // Focus textbox and move cursor to end instead of auto-submitting
+       if (inputRef.current) {
+         inputRef.current.focus();
+         const len = inputRef.current.value.length;
+         inputRef.current.setSelectionRange(len, len);
+       }
     }
-  }, [isLoading, onSubmit]);
+  }, [isLoading]);
 
   // Drag and Drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -409,7 +417,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
         className="flex-1 overflow-y-auto px-4 py-4 space-y-3 scrollbar-thin min-h-0"
       >
         {/* Empty State */}
-        {messages.length === 0 && (
+        {(messages.length === 0 || chatViewState === 'WELCOME') && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-4 px-2 animate-fade-in-up">
               <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-violet-500/15 to-purple-600/15 border border-violet-500/15 flex items-center justify-center">
@@ -438,7 +446,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
         )}
 
         {/* Messages */}
-        {messages
+        {chatViewState === 'ACTIVE' && messages
           .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
           .map((msg) => {
             const rawText = getMessageText(msg);
@@ -486,7 +494,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
             <div className="bg-red-900/15 border border-red-500/15 rounded-xl px-3.5 py-3 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
                 <svg className="w-4 h-4 text-red-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-                <span className="text-red-300 text-xs">Something went wrong. Please try again.</span>
+                <span className="text-red-300 text-xs font-semibold">{error.message || 'Something went wrong. Please try again.'}</span>
               </div>
               <button
                 onClick={handleRetry}
@@ -532,11 +540,13 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
               value={input}
               onChange={(e) => {
                 setInput(e.target.value);
+                setChatViewState('ACTIVE');
                 // Full duplex: typing interrupts voice
                 if (e.target.value.trim().length > 0) {
                   stopOutput();
                 }
               }}
+              onFocus={() => setChatViewState('ACTIVE')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
