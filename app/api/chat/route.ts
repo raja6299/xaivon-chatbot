@@ -1,5 +1,5 @@
 import { groq } from '@ai-sdk/groq';
-import { streamText, convertToModelMessages } from 'ai';
+import { streamText, convertToModelMessages, tool } from 'ai';
 import { knowledgeBase } from '@/lib/knowledge-base';
 import { checkRateLimit, sanitizeInput, chatRequestSchema, logAnalytics, logSecurity } from '@/lib/security';
 import { RAGManager } from '@/lib/rag/RAGManager';
@@ -235,7 +235,7 @@ export async function POST(req: Request) {
       messages: await convertToModelMessages(sanitizedMessages),
       temperature: 0.7,
       tools: {
-        sendSlackNotification: {
+        sendSlackNotification: tool({
           description: 'Send a message to the internal Slack team to notify them of an important event, high-value lead, or support request.',
           parameters: z.object({
             message: z.string().describe('The notification message to send to Slack.'),
@@ -245,8 +245,8 @@ export async function POST(req: Request) {
             const jobId = integrations.trigger('slack', { message });
             return { success: true, message: 'Slack notification triggered asynchronously in the background', jobId };
           },
-        },
-        syncHubSpotCRM: {
+        }),
+        syncHubSpotCRM: tool({
           description: 'Create or update a contact in HubSpot CRM.',
           parameters: z.object({
             email: z.string().email(),
@@ -259,8 +259,8 @@ export async function POST(req: Request) {
             const jobId = integrations.trigger('hubspot', contactDetails);
             return { success: true, message: 'CRM sync triggered asynchronously in the background', jobId };
           },
-        },
-        triggerZapierWebhook: {
+        }),
+        triggerZapierWebhook: tool({
           description: 'Trigger a custom Zapier workflow via Webhook.',
           parameters: z.object({
             url: z.string().url().describe('The Zapier Webhook URL'),
@@ -271,7 +271,7 @@ export async function POST(req: Request) {
             const jobId = integrations.trigger('webhook', { url, method: 'POST', data });
             return { success: true, message: 'Zapier workflow triggered asynchronously in the background', jobId };
           },
-        }
+        })
       },
     });
 
