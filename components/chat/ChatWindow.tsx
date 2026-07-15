@@ -110,9 +110,21 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
 
   const isLoading = status === 'submitted' || status === 'streaming';
 
+  // Issue 3: Scroll to Bottom state
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const isScrolledToBottomRef = useRef(true);
+
+  const handleScroll = useCallback(() => {
+    if (!messagesContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    isScrolledToBottomRef.current = isNearBottom;
+    setShowScrollButton(!isNearBottom);
+  }, []);
+
   // Smooth auto-scroll
   useEffect(() => {
-    if (messagesContainerRef.current) {
+    if (messagesContainerRef.current && isScrolledToBottomRef.current) {
       messagesContainerRef.current.scrollTo({
         top: messagesContainerRef.current.scrollHeight,
         behavior: 'smooth',
@@ -239,7 +251,23 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
 
     setInput('');
     clearFiles();
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+    }
   }, [input, files, isLoading, isProcessing, sendMessage, stopOutput, clearFiles]);
+
+  const getParsedError = (err: Error) => {
+    let msg = err.message || 'Unknown Error';
+    if (msg === 'An error occurred.') {
+      msg = 'Streaming Interrupted. Please try again.';
+    }
+    const match = msg.match(/(.*?)\s*\(Request ID:\s*(XAIVON-[A-Z0-9]+)\)/);
+    if (match) {
+      return { reason: match[1].trim(), requestId: match[2] };
+    }
+    return { reason: msg, requestId: null };
+  };
+
 
   // Quick suggestion
   const handleQuickSuggestion = useCallback((text: string) => {
@@ -414,6 +442,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
       {/* ─── MESSAGES AREA (scrollable) ─── */}
       <div
         ref={messagesContainerRef}
+        onScroll={handleScroll}
         className="flex-1 overflow-y-auto px-4 py-4 space-y-3 scrollbar-thin min-h-0"
       >
         {/* Empty State */}
@@ -489,25 +518,51 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
         )}
 
         {/* Error State */}
-        {error && (
+        {error && (() => {
+          const { reason, requestId } = getParsedError(error);
+          return (
           <div className="animate-fade-in-up">
-            <div className="bg-red-900/15 border border-red-500/15 rounded-xl px-3.5 py-3 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <svg className="w-4 h-4 text-red-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-                <span className="text-red-300 text-xs font-semibold">{error.message || 'Something went wrong. Please try again.'}</span>
+            <div className="bg-red-900/15 border border-red-500/15 rounded-xl px-4 py-3 flex flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-red-400 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-red-200 text-sm font-semibold">Unable to complete your request.</span>
+                  <div className="mt-1.5 space-y-1">
+                    <p className="text-red-300/80 text-xs"><span className="text-red-300 font-medium">Reason:</span> {reason}</p>
+                    {requestId && <p className="text-red-300/80 text-xs"><span className="text-red-300 font-medium">Request ID:</span> {requestId}</p>}
+                  </div>
+                </div>
               </div>
-              <button
-                onClick={handleRetry}
-                className="shrink-0 text-[11px] font-medium text-violet-300 hover:text-white bg-violet-500/10 hover:bg-violet-500/20 px-2.5 py-1 rounded-lg transition-all duration-200"
-              >
-                Retry
-              </button>
+              <div className="flex justify-end border-t border-red-500/10 pt-2 mt-1">
+                <button
+                  onClick={handleRetry}
+                  className="text-xs font-medium text-red-300 hover:text-white bg-red-500/10 hover:bg-red-500/20 px-3 py-1.5 rounded-lg transition-all duration-200"
+                >
+                  Retry
+                </button>
+              </div>
             </div>
           </div>
-        )}
+        )})()}
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Scroll to bottom button */}
+      {showScrollButton && (
+        <button
+          onClick={() => {
+            messagesContainerRef.current?.scrollTo({
+              top: messagesContainerRef.current.scrollHeight,
+              behavior: 'smooth'
+            });
+          }}
+          className="absolute bottom-[90px] right-6 z-40 p-2 bg-[#151d35]/80 backdrop-blur-md border border-violet-500/20 text-violet-300 rounded-full shadow-lg shadow-violet-500/10 hover:bg-[#1f2947] hover:text-white transition-all animate-fade-in-up"
+          aria-label="Scroll to bottom"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+        </button>
+      )}
 
       {/* ─── VOICE PLAYER ─── */}
       <VoicePlayer />
@@ -541,6 +596,8 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
               onChange={(e) => {
                 setInput(e.target.value);
                 setChatViewState('ACTIVE');
+                e.target.style.height = 'auto';
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
                 // Full duplex: typing interrupts voice
                 if (e.target.value.trim().length > 0) {
                   stopOutput();
@@ -551,12 +608,13 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   e.currentTarget.form?.requestSubmit();
+                  e.currentTarget.style.height = 'auto';
                 }
               }}
               placeholder={t('chat.placeholder')}
               disabled={isLoading || isLeadFormOpen}
               rows={1}
-              className="flex-1 px-3.5 py-2.5 bg-[#151d35] text-white text-sm rounded-xl placeholder-slate-500 disabled:opacity-30 focus:outline-none focus:ring-1 focus:ring-violet-500/40 border border-violet-500/8 focus:border-violet-500/25 transition-all duration-200 resize-none"
+              className="flex-1 px-3.5 py-2.5 bg-[#151d35] text-white text-sm rounded-xl placeholder-slate-500 disabled:opacity-30 focus:outline-none focus:ring-1 focus:ring-violet-500/40 border border-violet-500/8 focus:border-violet-500/25 transition-all duration-200 resize-none max-h-[200px] overflow-y-auto min-h-[44px]"
               aria-label="Type your message"
             />
             <button

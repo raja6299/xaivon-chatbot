@@ -316,8 +316,8 @@ export async function POST(req: Request) {
     logSecurity('ServerError', { endpoint: '/api/chat', requestId, errorMessage, error: String(error) });
 
     return new Response(
-      JSON.stringify({ error: `${errorMessage} (Request ID: ${requestId})` }),
-      { status: statusCode, headers: { 'Content-Type': 'application/json' } }
+      `${errorMessage} (Request ID: ${requestId})`,
+      { status: statusCode, headers: { 'Content-Type': 'text/plain' } }
     );
   }
 }
