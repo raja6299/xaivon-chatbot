@@ -2,6 +2,7 @@ import { groq } from '@ai-sdk/groq';
 import { streamText, convertToModelMessages } from 'ai';
 import { knowledgeBase } from '@/lib/knowledge-base';
 import { checkRateLimit, sanitizeInput, chatRequestSchema, logAnalytics, logSecurity } from '@/lib/security';
+import { RAGManager } from '@/lib/rag/RAGManager';
 
 const SYSTEM_PROMPT = `You are XAIVON's Enterprise Solutions Consultant — a knowledgeable, professional AI assistant embedded on the XAIVON website.
 
@@ -195,9 +196,32 @@ export async function POST(req: Request) {
     });
     const modelId = hasImage ? 'llama-3.2-90b-vision-preview' : 'llama-3.3-70b-versatile';
 
+    // 5. RAG Retrieval
+    const lastUserMessage = sanitizedMessages.filter(m => m.role === 'user').pop();
+    let ragContext = '';
+
+    if (lastUserMessage && typeof lastUserMessage.content === 'string') {
+      try {
+        const ragManager = RAGManager.getInstance();
+        await ragManager.initializeWithDefaults();
+        const results = await ragManager.retrieveContext(lastUserMessage.content, 4, 0.1);
+        
+        if (results.length > 0) {
+          ragContext = `\n\n## RETRIEVED KNOWLEDGE BASE CONTEXT (RAG)\nThe following context was retrieved from the Enterprise Knowledge Base. Use it to answer the user's latest query accurately. Prioritize this information over general knowledge.\n`;
+          results.forEach((res, i) => {
+            ragContext += `\n--- [Result ${i + 1} | Source: ${res.metadata.documentName} | Score: ${res.score.toFixed(2)}] ---\n${res.text}\n`;
+          });
+        }
+      } catch (err) {
+        console.error('RAG Retrieval Error:', err);
+      }
+    }
+
+    const finalSystemPrompt = SYSTEM_PROMPT + ragContext;
+
     const response = await streamText({
       model: groq(modelId),
-      system: SYSTEM_PROMPT,
+      system: finalSystemPrompt,
       messages: await convertToModelMessages(sanitizedMessages),
       temperature: 0.7,
     });
