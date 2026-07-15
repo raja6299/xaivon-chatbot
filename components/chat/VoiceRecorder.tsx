@@ -37,7 +37,7 @@ export function VoiceRecorder({ onTranscription, disabled, initialText = '' }: V
         type="button"
         onClick={handleClick}
         disabled={disabled && !isRecording}
-        className={`p-2.5 rounded-xl transition-all duration-300 flex items-center justify-center ${
+        className={`min-w-[44px] h-[44px] px-2 rounded-xl transition-all duration-300 flex items-center justify-center shrink-0 ${
           isRecording 
             ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30' 
             : 'text-slate-400 hover:text-violet-300 hover:bg-white/5 border border-transparent disabled:opacity-30'

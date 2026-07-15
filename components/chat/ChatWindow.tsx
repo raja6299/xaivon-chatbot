@@ -226,6 +226,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
 
     let finalText = input;
     const attachments: Array<{ name: string; contentType: string; url: string }> = [];
+    isScrolledToBottomRef.current = true;
 
     // Attach document text and image urls
     files.forEach(file => {
@@ -261,6 +262,17 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
     if (msg === 'An error occurred.') {
       msg = 'Streaming Interrupted. Please try again.';
     }
+    
+    // Try to parse as JSON first (from HTTP 400/500 responses)
+    try {
+      const parsed = JSON.parse(msg);
+      if (parsed.error) {
+        msg = parsed.error;
+      }
+    } catch {
+      // Not JSON, continue normally
+    }
+
     const match = msg.match(/(.*?)\s*\(Request ID:\s*(XAIVON-[A-Z0-9]+)\)/);
     if (match) {
       return { reason: match[1].trim(), requestId: match[2] };
@@ -549,20 +561,24 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* Scroll to bottom button */}
-      {showScrollButton && (
+      <div 
+        className={`absolute bottom-[100px] left-1/2 -translate-x-1/2 z-40 transition-all duration-300 ${showScrollButton ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+      >
         <button
           onClick={() => {
             messagesContainerRef.current?.scrollTo({
               top: messagesContainerRef.current.scrollHeight,
               behavior: 'smooth'
             });
+            isScrolledToBottomRef.current = true;
+            setShowScrollButton(false);
           }}
-          className="absolute bottom-[90px] right-6 z-40 p-2 bg-[#151d35]/80 backdrop-blur-md border border-violet-500/20 text-violet-300 rounded-full shadow-lg shadow-violet-500/10 hover:bg-[#1f2947] hover:text-white transition-all animate-fade-in-up"
+          className="p-2.5 bg-[#151d35]/90 backdrop-blur-md border border-violet-500/20 text-violet-300 rounded-full shadow-lg shadow-violet-500/10 hover:bg-[#1f2947] hover:text-white transition-colors flex items-center justify-center w-10 h-10"
           aria-label="Scroll to bottom"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
         </button>
-      )}
+      </div>
 
       {/* ─── VOICE PLAYER ─── */}
       <VoicePlayer />
@@ -599,14 +615,9 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
                 
                 // Optimize auto-resize to prevent unnecessary DOM reflows
                 const el = e.target;
-                const currentHeight = el.style.height;
-                el.style.height = '44px';
+                el.style.height = 'inherit';
                 const newHeight = `${Math.min(el.scrollHeight, 200)}px`;
-                if (currentHeight !== newHeight) {
-                  el.style.height = newHeight;
-                } else {
-                  el.style.height = currentHeight;
-                }
+                el.style.height = newHeight;
 
                 // Full duplex: typing interrupts voice
                 if (e.target.value.trim().length > 0) {
@@ -624,13 +635,14 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
               placeholder={t('chat.placeholder')}
               disabled={isLoading || isLeadFormOpen}
               rows={1}
-              className="flex-1 px-3.5 py-2.5 bg-[#151d35] text-white text-sm rounded-xl placeholder-slate-500 disabled:opacity-30 focus:outline-none focus:ring-1 focus:ring-violet-500/40 border border-violet-500/8 focus:border-violet-500/25 transition-all duration-200 resize-none max-h-[200px] overflow-y-auto min-h-[44px]"
+              className="flex-1 px-3.5 py-2.5 bg-[#151d35] text-white text-sm rounded-2xl placeholder-slate-500 disabled:opacity-30 focus:outline-none focus:ring-1 focus:ring-violet-500/40 border border-violet-500/8 focus:border-violet-500/25 transition-colors duration-200 resize-none max-h-[200px] overflow-y-auto scrollbar-thin min-h-[44px]"
               aria-label="Type your message"
+              style={{ height: '44px' }}
             />
             <button
               type="submit"
               disabled={isLoading || isProcessing || (!input.trim() && files.length === 0) || isLeadFormOpen}
-              className="p-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 disabled:opacity-30 disabled:hover:from-violet-600 disabled:hover:to-purple-600 text-white rounded-xl transition-all duration-200 shadow-lg shadow-violet-500/10 hover:shadow-violet-500/20"
+              className="w-[44px] h-[44px] flex items-center justify-center flex-shrink-0 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 disabled:opacity-30 disabled:hover:from-violet-600 disabled:hover:to-purple-600 text-white rounded-xl transition-all duration-200 shadow-lg shadow-violet-500/10 hover:shadow-violet-500/20"
               aria-label="Send message"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

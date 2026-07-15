@@ -50,7 +50,7 @@ export function sanitizeInput(input: string): string {
 // ZOD SCHEMAS
 // ==========================================
 export const chatRequestSchema = z.object({
-  messages: z.array(z.any()).max(50),
+  messages: z.array(z.any()).max(500),
 });
 
 export const leadRequestSchema = z.object({

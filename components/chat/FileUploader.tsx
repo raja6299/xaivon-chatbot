@@ -37,7 +37,7 @@ export function FileUploader({ onFilesSelected, disabled }: FileUploaderProps) {
         type="button"
         onClick={handleClick}
         disabled={disabled}
-        className="p-2.5 text-slate-400 hover:text-white bg-[#151d35] border border-violet-500/8 hover:border-violet-500/25 rounded-xl transition-all duration-200 disabled:opacity-30 flex items-center justify-center shrink-0"
+        className="w-[44px] h-[44px] text-slate-400 hover:text-white bg-[#151d35] border border-violet-500/8 hover:border-violet-500/25 rounded-xl transition-all duration-200 disabled:opacity-30 flex items-center justify-center shrink-0"
         aria-label="Upload file"
       >
         <Paperclip className="w-4 h-4" />
