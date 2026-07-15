@@ -8,7 +8,10 @@ import { LeadFormModal } from './LeadFormModal';
 import { CalendarModal } from './CalendarModal';
 import { VoiceRecorder } from './VoiceRecorder';
 import { VoicePlayer } from './VoicePlayer';
+import { FileUploader } from './FileUploader';
+import { AttachmentCard } from './AttachmentCard';
 import { useVoice } from '../../hooks/useVoice';
+import { useFiles } from '../../hooks/useFiles';
 
 function getMessageText(message: UIMessage): string {
   return message.parts
@@ -80,6 +83,10 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [hasSubmittedLead, setHasSubmittedLead] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // File Management
+  const { files, isProcessing, addFiles, removeFile, clearFiles, retryFile } = useFiles();
 
   // Voice integration
   const { speak, stopOutput } = useVoice();
@@ -184,14 +191,39 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
   // Submit handler
   const onSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
     e?.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && files.length === 0) || isLoading || isProcessing) return;
     
     // Stop any ongoing voice output when user sends a new message
     stopOutput();
 
-    sendMessage({ text: input });
+    let finalText = input;
+    const attachments: Array<{ name: string; contentType: string; url: string }> = [];
+
+    // Attach document text and image urls
+    files.forEach(file => {
+      if (file.status === 'ready') {
+        if (file.type === 'image' && file.previewUrl) {
+          attachments.push({
+            name: file.name,
+            contentType: file.file.type,
+            url: file.previewUrl
+          });
+        } else if (file.extractedText) {
+          finalText += `\n\n[Attached Document: ${file.name}]\n${file.extractedText}\n[End of Document]`;
+        }
+      }
+    });
+
+    // Vercel AI SDK standard message append format
+    if (attachments.length > 0) {
+      sendMessage({ text: finalText, experimental_attachments: attachments } as unknown as Parameters<typeof sendMessage>[0]);
+    } else {
+      sendMessage({ text: finalText });
+    }
+
     setInput('');
-  }, [input, isLoading, sendMessage, stopOutput]);
+    clearFiles();
+  }, [input, files, isLoading, isProcessing, sendMessage, stopOutput, clearFiles]);
 
   // Quick suggestion
   const handleQuickSuggestion = useCallback((text: string) => {
@@ -240,20 +272,61 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
   };
 
   const handleTranscription = useCallback((text: string, isFinal: boolean) => {
-    // Overwrite the current input with interim text. 
-    // In a production scenario with caret tracking, this would append, 
-    // but for chatbot voice, full replacement of current utterance is standard.
     if (text) setInput(text);
     if (isFinal && text.trim() && !isLoading) {
-       // A short timeout lets the UI update before submitting
        setTimeout(() => {
          onSubmit();
        }, 50);
     }
   }, [isLoading, onSubmit]);
 
+  // Drag and Drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      addFiles(e.dataTransfer.files);
+    }
+  }, [addFiles]);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    if (e.clipboardData.files && e.clipboardData.files.length > 0) {
+      addFiles(e.clipboardData.files);
+    }
+  }, [addFiles]);
+
   return (
-    <div className="flex flex-col h-full w-full bg-gradient-to-b from-[#0f1629] to-[#0a0e1a] overflow-hidden relative">
+    <div 
+      className="flex flex-col h-full w-full bg-gradient-to-b from-[#0f1629] to-[#0a0e1a] overflow-hidden relative"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      onPaste={handlePaste}
+    >
+      {/* Drag Overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-50 bg-[#0a0e1a]/80 backdrop-blur-sm border-2 border-dashed border-violet-500/50 m-4 rounded-3xl flex flex-col items-center justify-center pointer-events-none">
+          <div className="w-16 h-16 bg-violet-500/20 rounded-full flex items-center justify-center mb-4">
+            <svg className="w-8 h-8 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+          </div>
+          <p className="text-xl font-semibold text-white">Drop files to upload</p>
+          <p className="text-sm text-slate-400 mt-2">Supports Images and Documents</p>
+        </div>
+      )}
 
       {/* ─── HEADER (sticky) ─── */}
       <div className="shrink-0 px-4 py-3 border-b border-violet-500/10 bg-[#111a33]/80 backdrop-blur-md z-10">
@@ -386,8 +459,27 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
 
       {/* ─── INPUT AREA (sticky) ─── */}
       <div className="shrink-0 border-t border-violet-500/8 bg-[#0d1322]/90 backdrop-blur-md">
+        
+        {/* Attachments List */}
+        {files.length > 0 && (
+          <div className="px-3.5 pt-3 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {files.map(file => (
+              <AttachmentCard 
+                key={file.id} 
+                file={file} 
+                onRemove={removeFile} 
+                onRetry={retryFile} 
+              />
+            ))}
+          </div>
+        )}
+
         <form onSubmit={onSubmit} className="px-3.5 py-3">
           <div className="flex gap-2 items-end">
+            <FileUploader 
+              onFilesSelected={addFiles} 
+              disabled={isLoading || isLeadFormOpen}
+            />
             <textarea
               ref={inputRef}
               value={input}
@@ -412,7 +504,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
             />
             <button
               type="submit"
-              disabled={isLoading || !input.trim() || isLeadFormOpen}
+              disabled={isLoading || isProcessing || (!input.trim() && files.length === 0) || isLeadFormOpen}
               className="p-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 disabled:opacity-30 disabled:hover:from-violet-600 disabled:hover:to-purple-600 text-white rounded-xl transition-all duration-200 shadow-lg shadow-violet-500/10 hover:shadow-violet-500/20"
               aria-label="Send message"
             >

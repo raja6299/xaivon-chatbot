@@ -188,9 +188,15 @@ export async function POST(req: Request) {
       timestamp: new Date().toISOString() 
     });
 
-    // 4. AI Stream
+    // 4. AI Stream (Detect if vision model is needed)
+    const hasImage = sanitizedMessages.some((m: unknown) => {
+      const msg = m as { experimental_attachments?: Array<{ contentType?: string }> };
+      return msg.experimental_attachments && msg.experimental_attachments.some(a => a.contentType?.startsWith('image/'));
+    });
+    const modelId = hasImage ? 'llama-3.2-90b-vision-preview' : 'llama-3.3-70b-versatile';
+
     const response = await streamText({
-      model: groq('llama-3.3-70b-versatile'),
+      model: groq(modelId),
       system: SYSTEM_PROMPT,
       messages: await convertToModelMessages(sanitizedMessages),
       temperature: 0.7,
