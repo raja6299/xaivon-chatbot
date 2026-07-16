@@ -72,10 +72,14 @@ function getContextualSuggestions(messages: UIMessage[]): { icon: string; text: 
 }
 
 export function ChatWindow({ onClose }: { onClose: () => void }) {
-  // Use a fixed generic ID for the chat instance to maintain state internally if needed
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
   const { messages, sendMessage, status, error, setMessages } = useChat({
     id: 'xaivon-persistent-chat',
-    transport: new DefaultChatTransport({ api: '/api/chat' }),
+    transport: new DefaultChatTransport({ 
+      api: '/api/chat',
+      headers: sessionId ? { 'x-session-id': sessionId } : undefined,
+    }),
   });
   
   type ChatViewState = 'WELCOME' | 'ACTIVE';
@@ -87,7 +91,6 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
   const [isLeadFormOpen, setIsLeadFormOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [hasSubmittedLead, setHasSubmittedLead] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const { t, language, setLanguage } = useTranslation();
@@ -260,7 +263,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
   const getParsedError = (err: Error) => {
     let msg = err.message || 'Unknown Error';
     if (msg === 'An error occurred.') {
-      msg = 'Streaming Interrupted. Please try again.';
+      msg = 'Unable to complete your request. Please try again in a few moments.';
     }
     
     // Try to parse as JSON first (from HTTP 400/500 responses)

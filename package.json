@@ -11,6 +11,7 @@
   "dependencies": {
     "@ai-sdk/groq": "^4.0.8",
     "@ai-sdk/react": "^4.0.19",
+    "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.2",
     "ai": "^7.0.18",
     "date-fns": "^4.4.0",
@@ -27,7 +28,7 @@
     "recharts": "^3.9.2",
     "remark-gfm": "^4.0.1",
     "uuid": "^14.0.1",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz",
     "zod": "^4.4.3"
   },
   "devDependencies": {

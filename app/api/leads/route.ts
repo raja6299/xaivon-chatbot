@@ -106,7 +106,7 @@ export async function POST(req: Request) {
 
     try {
       const { data: existingLead } = await supabase
-        .from('leads')
+        .from('enterprise_leads')
         .select('id')
         .or(orQuery)
         .limit(1);
@@ -122,16 +122,16 @@ export async function POST(req: Request) {
 
     // Insert (matches exact live schema)
     const insertPayload = {
-      name: fullName,
+      full_name: fullName,
       email: cleanEmail,
       company: company,
       phone: cleanPhone,
       session_id: sessionId || null,
-      status: 'new',
+      pipeline_stage: 'new',
     };
 
     const { data, error } = await supabase
-      .from('leads')
+      .from('enterprise_leads')
       .insert([insertPayload])
       .select();
 

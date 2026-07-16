@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { after } from 'next/server';
 
 // ==========================================
 // RATE LIMITING (Sliding Window)
@@ -51,6 +52,7 @@ export function sanitizeInput(input: string): string {
 // ==========================================
 export const chatRequestSchema = z.object({
   messages: z.array(z.any()).max(500),
+  sessionId: z.string().optional(),
 });
 
 export const leadRequestSchema = z.object({
@@ -72,17 +74,37 @@ export const leadRequestSchema = z.object({
 });
 
 // ==========================================
-// ANALYTICS & LOGGING
+// ANALYTICS & LOGGING (Phase 14 Persistent Audit Logs)
 // ==========================================
-export function logAnalytics(event: string, data: Record<string, unknown>) {
-  // Fire and forget, no blocking
-  setImmediate(() => {
-    console.log(`[Analytics] [${event}]`, JSON.stringify(data));
+async function persistLog(action: string, severity: 'info' | 'warning' | 'error' | 'critical', details: Record<string, unknown>) {
+  after(async () => {
+    try {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!url || !serviceRoleKey) return;
+      
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(url, serviceRoleKey);
+      
+      await supabase.from('audit_logs').insert({
+        action,
+        severity,
+        details,
+        ip_address: typeof details.ip === 'string' ? details.ip : null,
+        request_id: typeof details.requestId === 'string' ? details.requestId : null,
+      });
+    } catch (err) {
+      console.error('Failed to persist audit log', err);
+    }
   });
 }
 
+export function logAnalytics(event: string, data: Record<string, unknown>) {
+  console.log(`[Analytics] [${event}]`, JSON.stringify(data));
+  persistLog(event, 'info', data);
+}
+
 export function logSecurity(event: string, details: Record<string, unknown>) {
-  setImmediate(() => {
-    console.error(`[Security] [${event}]`, JSON.stringify(details));
-  });
+  console.error(`[Security] [${event}]`, JSON.stringify(details));
+  persistLog(event, 'warning', details);
 }

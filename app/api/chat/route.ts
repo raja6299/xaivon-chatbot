@@ -195,14 +195,26 @@ export async function POST(req: Request) {
       );
     }
 
-    const { messages } = validationResult.data;
+    const { messages, sessionId: bodySessionId } = validationResult.data;
+    const sessionId = req.headers.get('x-session-id') || bodySessionId;
 
     // Sanitize message content to prevent prompt injection and XSS
     const sanitizedMessages = messages.map(m => {
-      if (typeof m === 'object' && m !== null && typeof m.content === 'string') {
-        return { ...m, content: sanitizeInput(m.content) };
+      let sanitized = m;
+      if (typeof m === 'object' && m !== null) {
+        sanitized = { ...m };
+        if (typeof m.content === 'string') {
+          sanitized.content = sanitizeInput(m.content);
+        }
+        
+        // Polyfill `.parts` if missing. The Vercel AI SDK convertToModelMessages strictly 
+        // iterates over message.parts. Old localStorage sessions or basic UIMessage payloads 
+        // might lack this array, which caused the 'Cannot read properties of undefined' crash.
+        if (!sanitized.parts && typeof sanitized.content === 'string') {
+          sanitized.parts = [{ type: 'text', text: sanitized.content }];
+        }
       }
-      return m;
+      return sanitized;
     });
 
     // 3. Analytics
@@ -245,10 +257,31 @@ export async function POST(req: Request) {
     // 6. Modular Context Management (Prevent Token Overflow)
     const contextSafeMessages = prepareConversationContext(sanitizedMessages);
 
+    // Save User message to Supabase
+    if (sessionId && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabaseAdmin = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY
+        );
+        
+        await supabaseAdmin.from('messages').insert({
+          session_id: sessionId,
+          role: 'user',
+          content: lastUserMessage.content,
+        });
+      } catch (err) {
+        console.error('Failed to persist user message:', err);
+      }
+    }
+
+    const startTime = Date.now();
+
     const response = await streamText({
       model: groq(modelId),
       system: finalSystemPrompt,
-      messages: await convertToModelMessages(contextSafeMessages),
+      messages: await convertToModelMessages(contextSafeMessages as import('ai').UIMessage[]),
       temperature: 0.7,
       tools: {
         sendSlackNotification: {
@@ -257,7 +290,6 @@ export async function POST(req: Request) {
             message: z.string().describe('The notification message to send to Slack.'),
           }),
           execute: async ({ message }: { message: string }) => {
-            console.log('Tool call: sendSlackNotification');
             const jobId = integrations.trigger('slack', { message });
             return { success: true, message: 'Slack notification triggered asynchronously in the background', jobId };
           },
@@ -271,7 +303,6 @@ export async function POST(req: Request) {
             company: z.string().optional(),
           }),
           execute: async (contactDetails: Record<string, unknown>) => {
-            console.log('Tool call: syncHubSpotCRM');
             const jobId = integrations.trigger('hubspot', contactDetails);
             return { success: true, message: 'CRM sync triggered asynchronously in the background', jobId };
           },
@@ -283,27 +314,72 @@ export async function POST(req: Request) {
             data: z.record(z.string(), z.any()).describe('The JSON payload to send to Zapier'),
           }),
           execute: async ({ url, data }: { url: string; data: Record<string, unknown> }) => {
-            console.log('Tool call: triggerZapierWebhook');
             const jobId = integrations.trigger('webhook', { url, method: 'POST', data });
             return { success: true, message: 'Zapier workflow triggered asynchronously in the background', jobId };
           },
         }
       },
-      onError: (err) => {
-        let errorMessage = 'Streaming Error';
-        const errString = String(err).toLowerCase();
-        if (errString.includes('rate limit') || errString.includes('429')) {
-          errorMessage = 'Rate Limit Exceeded. Please try again later.';
-        } else if (errString.includes('context_length_exceeded') || errString.includes('too large') || errString.includes('413')) {
-          errorMessage = 'Context Too Large. Please start a new conversation.';
-        } else if (errString.includes('timeout') || errString.includes('abort')) {
-          errorMessage = 'Request Timeout. Please try again.';
-        } else if (errString.includes('fetch failed') || errString.includes('network')) {
-          errorMessage = 'Network Error. Please check your connection.';
-        } else if (errString.includes('api key')) {
-          errorMessage = 'API Key Error. Please verify your configuration.';
+      onError: (err: unknown) => {
+        const latency = Date.now() - startTime;
+        
+        let providerStatusCode = 'UNKNOWN';
+        let providerErrorMessage = 'Unknown Streaming Error';
+        
+        // Extract structured error from provider if available (Groq / OpenAI format)
+        if (err && typeof err === 'object') {
+          const e = err as Record<string, any>;
+          if (e.statusCode || e.status) providerStatusCode = String(e.statusCode || e.status);
+          
+          // Try to dig into standard nested error structures (e.g. data.error.message)
+          if (e.data && e.data.error && e.data.error.message) {
+            providerErrorMessage = e.data.error.message;
+            if (e.data.error.code) providerStatusCode = String(e.data.error.code);
+          } else if (e.error && e.error.message) {
+            providerErrorMessage = e.error.message;
+          } else if (e.message) {
+            providerErrorMessage = e.message;
+          }
+        } else {
+          providerErrorMessage = String(err);
         }
-        logSecurity('StreamError', { requestId, error: errorMessage, raw: errString });
+
+        // Server-side only detailed logging for observability
+        console.error(`[STREAM_ERROR] RequestId: ${requestId}`);
+        console.error(`[STREAM_ERROR] Provider: Groq (${modelId})`);
+        console.error(`[STREAM_ERROR] StatusCode: ${providerStatusCode}`);
+        console.error(`[STREAM_ERROR] Message: ${providerErrorMessage}`);
+        console.error(`[STREAM_ERROR] Latency: ${latency}ms`);
+        console.error(`[STREAM_ERROR] SessionId: ${sessionId || 'Anonymous'}`);
+        
+        logSecurity('StreamError', { 
+          requestId, 
+          provider: 'Groq',
+          statusCode: providerStatusCode,
+          error: providerErrorMessage, 
+          latencyMs: latency,
+          sessionId
+        });
+      },
+      onFinish: async ({ text, usage }) => {
+        // Save Assistant message to Supabase
+        if (sessionId && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          try {
+            const { createClient } = await import('@supabase/supabase-js');
+            const supabaseAdmin = createClient(
+              process.env.NEXT_PUBLIC_SUPABASE_URL!,
+              process.env.SUPABASE_SERVICE_ROLE_KEY
+            );
+            
+            await supabaseAdmin.from('messages').insert({
+              session_id: sessionId,
+              role: 'assistant',
+              content: text,
+              token_usage: usage?.totalTokens || 0,
+            });
+          } catch (err) {
+            console.error('Failed to persist assistant message:', err);
+          }
+        }
       }
     });
 

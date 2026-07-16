@@ -2,7 +2,7 @@ import { SemanticChunker } from './chunking/semantic';
 import { knowledgeBase } from '../knowledge-base';
 import { MockEmbeddingProvider } from './embeddings/mock';
 import { DocumentMetadata, EmbeddingProvider, RAGConfig, SearchResult, VectorStore } from './types';
-import { MemoryVectorStore } from './vector/memory';
+import { SupabaseVectorStore } from './vector/supabase';
 
 export class RAGManager {
   private static instance: RAGManager;
@@ -20,8 +20,8 @@ export class RAGManager {
     
     // Default provider initializations (Can be injected/swapped for production)
     this.chunker = new SemanticChunker(this.config.chunkSize, this.config.chunkOverlap);
-    this.embedder = new MockEmbeddingProvider(384);
-    this.store = new MemoryVectorStore();
+    this.embedder = new MockEmbeddingProvider(384); // Assuming 384 dim matches VECTOR(384) in SQL
+    this.store = new SupabaseVectorStore();
   }
 
   public static getInstance(): RAGManager {

@@ -39,7 +39,6 @@ export async function POST() {
           {
             id: sessionId,
             status: 'active',
-            message_count: 0,
           },
         ])
         .select();
