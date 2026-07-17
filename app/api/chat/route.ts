@@ -311,9 +311,11 @@ export async function POST(req: Request) {
           description: 'Trigger a custom Zapier workflow via Webhook.',
           inputSchema: z.object({
             url: z.string().url().describe('The Zapier Webhook URL'),
-            data: z.record(z.string(), z.any()).describe('The JSON payload to send to Zapier'),
+            payload: z.string().describe('The JSON string payload to send to Zapier'),
           }),
-          execute: async ({ url, data }: { url: string; data: Record<string, unknown> }) => {
+          execute: async ({ url, payload }: { url: string; payload: string }) => {
+            let data: Record<string, unknown> = {};
+            try { data = JSON.parse(payload); } catch { data = { raw: payload }; }
             const jobId = integrations.trigger('webhook', { url, method: 'POST', data });
             return { success: true, message: 'Zapier workflow triggered asynchronously in the background', jobId };
           },
