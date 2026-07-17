@@ -262,10 +262,8 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
 
   const getParsedError = (err: Error) => {
     let msg = err.message || 'Unknown Error';
-    if (msg === 'An error occurred.') {
-      msg = 'Unable to complete your request. Please try again in a few moments.';
-    }
     
+
     // Try to parse as JSON first (from HTTP 400/500 responses)
     try {
       const parsed = JSON.parse(msg);

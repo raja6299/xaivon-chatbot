@@ -327,6 +327,7 @@ export async function POST(req: Request) {
         
         // Extract structured error from provider if available (Groq / OpenAI format)
         if (err && typeof err === 'object') {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const e = err as Record<string, any>;
           if (e.statusCode || e.status) providerStatusCode = String(e.statusCode || e.status);
           
@@ -383,33 +384,32 @@ export async function POST(req: Request) {
       }
     });
 
-    return response.toUIMessageStreamResponse();
+    return response.toUIMessageStreamResponse({
+      onError: (err: unknown) => {
+        const errString = String(err).toLowerCase();
+        
+        console.error('[STREAM_ERROR]', err);
+        logSecurity('StreamError', { endpoint: '/api/chat', requestId, error: String(err), sessionId });
+        
+        if (errString.includes('rate limit') || errString.includes('429')) {
+          return 'Rate limit exceeded. Please try again later.';
+        }
+        if (errString.includes('context_length_exceeded') || errString.includes('too large') || errString.includes('413')) {
+          return 'Conversation too large. Please start a new chat.';
+        }
+        if (errString.includes('timeout') || errString.includes('abort') || errString.includes('network') || errString.includes('fetch failed')) {
+          return 'Request timed out. Please try again.';
+        }
+        
+        return 'Server error. Please try again.';
+      }
+    });
   } catch (error) {
-    let errorMessage = 'Server Error';
-    let statusCode = 500;
-    const errString = String(error).toLowerCase();
-    
-    if (errString.includes('rate limit') || errString.includes('429')) {
-      errorMessage = 'Rate Limit Exceeded. Please try again later.';
-      statusCode = 429;
-    } else if (errString.includes('context_length_exceeded') || errString.includes('too large') || errString.includes('413')) {
-      errorMessage = 'Context Too Large. Please start a new conversation.';
-      statusCode = 413;
-    } else if (errString.includes('timeout') || errString.includes('abort')) {
-      errorMessage = 'Request Timeout. Please try again.';
-      statusCode = 504;
-    } else if (errString.includes('fetch failed') || errString.includes('network')) {
-      errorMessage = 'Network Error. Please check your connection.';
-      statusCode = 502;
-    } else if (errString.includes('tool')) {
-      errorMessage = 'Integration Tool Failure.';
-    }
-
-    logSecurity('ServerError', { endpoint: '/api/chat', requestId, errorMessage, error: String(error) });
+    logSecurity('ServerError', { endpoint: '/api/chat', requestId, errorMessage: 'Initialization Error', error: String(error) });
 
     return new Response(
-      `${errorMessage} (Request ID: ${requestId})`,
-      { status: statusCode, headers: { 'Content-Type': 'text/plain' } }
+      `Server error. Please try again. (Request ID: ${requestId})`,
+      { status: 500, headers: { 'Content-Type': 'text/plain' } }
     );
   }
 }

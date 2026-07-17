@@ -21,6 +21,7 @@ export class SupabaseVectorStore implements VectorStore {
     const deterministicUuid = '00000000-0000-0000-0000-000000000001';
     
     // Ensure the doc exists
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (this.supabase as any).from('knowledge_docs').upsert({
       id: deterministicUuid,
       title: chunks[0]?.metadata.documentName || 'Unknown Document',
@@ -35,6 +36,7 @@ export class SupabaseVectorStore implements VectorStore {
       metadata: chunk.metadata,
     }));
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (this.supabase as any).from('knowledge_chunks').insert(rows);
     if (error) {
       console.error('Failed to add chunks to Supabase:', error);
@@ -68,6 +70,7 @@ export class SupabaseVectorStore implements VectorStore {
       ? '00000000-0000-0000-0000-000000000001' 
       : documentId;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (this.supabase as any)
       .from('knowledge_docs')
       .delete()
