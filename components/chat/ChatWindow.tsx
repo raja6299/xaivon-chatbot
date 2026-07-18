@@ -98,8 +98,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
   const { files, isProcessing, addFiles, removeFile, clearFiles, retryFile } = useFiles();
 
   // Voice integration
-  const { speak, stopOutput, updateSettings, settings, getAvailableVoices } = useVoice();
-  const prevIsLoading = useRef<boolean>(false);
+  const { stopOutput, updateSettings, settings, getAvailableVoices } = useVoice();
   const [availableVoices, setAvailableVoices] = useState<{uri: string, name: string, lang: string}[]>([]);
 
   // Load available voices
