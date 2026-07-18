@@ -7,7 +7,6 @@ import { ChatMessage } from './ChatMessage';
 import { LeadFormModal } from './LeadFormModal';
 import { CalendarModal } from './CalendarModal';
 import { VoiceRecorder } from './VoiceRecorder';
-import { VoicePlayer } from './VoicePlayer';
 import { FileUploader } from './FileUploader';
 import { AttachmentCard } from './AttachmentCard';
 import { useVoice } from '../../hooks/useVoice';
@@ -203,21 +202,6 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
       setIsLeadFormOpen(true);
     }
   }, [messages, isLeadFormOpen, hasSubmittedLead, stopOutput]);
-
-  // TTS Trigger: when loading finishes and last message is assistant
-  useEffect(() => {
-    if (prevIsLoading.current && !isLoading) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage && lastMessage.role === 'assistant') {
-        const text = getMessageText(lastMessage);
-        // Do not auto-speak the lead trigger itself 
-        if (!text.includes(LEAD_TRIGGER)) {
-           speak(text);
-        }
-      }
-    }
-    prevIsLoading.current = isLoading;
-  }, [isLoading, messages, speak]);
 
   // Submit handler
   const onSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
@@ -490,14 +474,16 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
         {/* Messages */}
         {chatViewState === 'ACTIVE' && messages
           .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
-          .map((msg) => {
+          .map((msg, index, arr) => {
             const rawText = getMessageText(msg);
             const cleanedContent = rawText.replace(/\[TRIGGER_LEAD_FORM\]/g, '').trim();
+            const isCurrentlyStreaming = isLoading && index === arr.length - 1 && msg.role === 'assistant';
             return (
               <ChatMessage
                 key={msg.id}
                 role={msg.role as 'user' | 'assistant'}
                 content={cleanedContent}
+                isStreaming={isCurrentlyStreaming}
               />
             );
           })}
@@ -580,9 +566,6 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
         </button>
       </div>
-
-      {/* ─── VOICE PLAYER ─── */}
-      <VoicePlayer />
 
       {/* ─── INPUT AREA (sticky) ─── */}
       <div className="shrink-0 border-t border-violet-500/8 bg-[#0d1322]/90 backdrop-blur-md">

@@ -19,7 +19,7 @@ export interface VoiceSettings {
 }
 
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
-  autoSpeak: true,
+  autoSpeak: false,
   preferredVoiceURI: null,
   playbackSpeed: 1.0,
   language: 'en-US',
