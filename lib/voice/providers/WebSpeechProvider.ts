@@ -16,6 +16,15 @@ export class WebSpeechProvider implements VoiceProvider {
         this.recognition.interimResults = true;
       }
       this.synthesis = window.speechSynthesis;
+      if (this.synthesis) {
+        // Pre-warm voices
+        this.synthesis.getVoices();
+        if (this.synthesis.onvoiceschanged !== undefined) {
+          this.synthesis.onvoiceschanged = () => {
+            this.synthesis?.getVoices();
+          };
+        }
+      }
     }
   }
 
@@ -126,31 +135,52 @@ export class WebSpeechProvider implements VoiceProvider {
     utterance.lang = settings.language;
 
     let selectedVoice = null;
-    const voices = this.synthesis.getVoices();
+    let voices = this.synthesis.getVoices();
+
+    if (voices.length === 0) {
+      voices = this.synthesis.getVoices(); // Second attempt for some browsers
+    }
 
     if (settings.preferredVoiceURI) {
       selectedVoice = voices.find(v => v.voiceURI === settings.preferredVoiceURI);
     }
     
     if (!selectedVoice && voices.length > 0) {
-      const isEnglish = (v: SpeechSynthesisVoice) => v.lang.toLowerCase().startsWith('en');
-      const isHindi = (v: SpeechSynthesisVoice) => v.lang.toLowerCase().startsWith('hi');
-      
-      const findBest = (filterFn: (v: SpeechSynthesisVoice) => boolean) => {
-        const filtered = voices.filter(filterFn);
-        return filtered.find(v => v.name.includes('Natural')) ||
-               filtered.find(v => v.name.includes('Google')) ||
-               filtered.find(v => v.name.includes('Microsoft')) ||
-               filtered.find(v => v.default) ||
-               filtered[0];
+      const getScore = (v: SpeechSynthesisVoice) => {
+        let score = 0;
+        const lang = v.lang.toLowerCase();
+        const name = v.name.toLowerCase();
+        
+        if (lang.startsWith('en')) {
+          score += 20; // Strongly prefer English
+          if (lang === 'en-us') score += 5;
+          if (lang === 'en-gb') score += 4;
+          
+          // Premium voices
+          if (name.includes('natural') || name.includes('premium') || name.includes('online')) score += 15;
+          if (name.includes('google')) score += 8;
+          if (name.includes('microsoft')) score += 6;
+          if (name.includes('siri')) score += 6;
+          
+          if (v.default) score += 2;
+        } else if (lang.startsWith('hi')) {
+          score += 5;
+        }
+        return score;
       };
 
-      selectedVoice = findBest(isEnglish) || findBest(isHindi) || voices[0];
+      const sortedVoices = [...voices].sort((a, b) => getScore(b) - getScore(a));
+      selectedVoice = sortedVoices[0];
     }
 
     if (selectedVoice) {
       utterance.voice = selectedVoice;
     }
+
+    // Professional AI Consultant voice tuning
+    utterance.rate = settings.playbackSpeed === 1.0 ? 0.95 : settings.playbackSpeed; // Slightly calm pace by default
+    utterance.pitch = 0.98; // Slightly deeper, more authoritative tone
+    utterance.volume = 1.0;
 
     utterance.onstart = onStart;
     utterance.onend = onEnd;

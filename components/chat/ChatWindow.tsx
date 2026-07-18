@@ -98,8 +98,28 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
   const { files, isProcessing, addFiles, removeFile, clearFiles, retryFile } = useFiles();
 
   // Voice integration
-  const { speak, stopOutput, updateSettings } = useVoice();
+  const { speak, stopOutput, updateSettings, settings, getAvailableVoices } = useVoice();
   const prevIsLoading = useRef<boolean>(false);
+  const [availableVoices, setAvailableVoices] = useState<{uri: string, name: string, lang: string}[]>([]);
+
+  // Load available voices
+  useEffect(() => {
+    getAvailableVoices().then(voices => {
+      // Filter for English voices, prioritize clean names, limit to top 8 to keep UI clean
+      const enVoices = voices.filter(v => v.lang.toLowerCase().startsWith('en'));
+      // Sort to prefer natural/premium voices
+      enVoices.sort((a, b) => {
+        const aName = a.name.toLowerCase();
+        const bName = b.name.toLowerCase();
+        const aScore = (aName.includes('natural') ? 10 : 0) + (aName.includes('google') ? 5 : 0);
+        const bScore = (bName.includes('natural') ? 10 : 0) + (bName.includes('google') ? 5 : 0);
+        return bScore - aScore;
+      });
+      // Deduplicate by name and limit
+      const uniqueVoices = enVoices.filter((v, i, a) => a.findIndex(t => t.name === v.name) === i).slice(0, 8);
+      setAvailableVoices(uniqueVoices);
+    });
+  }, [getAvailableVoices]);
 
   // Sync voice language with UI language preference
   useEffect(() => {
@@ -411,7 +431,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
                         key={lang}
                         onClick={() => {
                           setLanguage(lang);
-                          setShowSettings(false);
+                          // We don't close settings immediately so user can also select voice
                         }}
                         className={`w-full text-left px-3 py-2 text-xs transition-colors ${language === lang ? 'bg-violet-500/20 text-violet-300' : 'text-slate-300 hover:bg-white/5'}`}
                       >
@@ -419,6 +439,32 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
                       </button>
                     ))}
                   </div>
+
+                  {availableVoices.length > 0 && (
+                    <>
+                      <div className="px-3 py-2 border-t border-b border-white/5 bg-[#1a233a]">
+                        <p className="text-[10px] uppercase font-semibold text-violet-300/70">AI Voice</p>
+                      </div>
+                      <div className="py-1 max-h-[160px] overflow-y-auto scrollbar-thin">
+                        <button
+                          onClick={() => updateSettings({ preferredVoiceURI: null })}
+                          className={`w-full text-left px-3 py-2 text-xs transition-colors truncate ${!settings?.preferredVoiceURI ? 'bg-violet-500/20 text-violet-300' : 'text-slate-300 hover:bg-white/5'}`}
+                        >
+                          Auto (Best Available)
+                        </button>
+                        {availableVoices.map(voice => (
+                          <button
+                            key={voice.uri}
+                            title={voice.name}
+                            onClick={() => updateSettings({ preferredVoiceURI: voice.uri })}
+                            className={`w-full text-left px-3 py-2 text-xs transition-colors truncate ${settings?.preferredVoiceURI === voice.uri ? 'bg-violet-500/20 text-violet-300' : 'text-slate-300 hover:bg-white/5'}`}
+                          >
+                            {voice.name.replace(/Microsoft|Google|English|United States/gi, '').trim() || voice.name}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
