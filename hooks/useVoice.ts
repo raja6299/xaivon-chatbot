@@ -49,7 +49,7 @@ export function useVoice(onResult?: (text: string, isFinal: boolean) => void) {
   }, [manager]);
 
   const speak = useCallback((text: string) => {
-    manager.speakResponse(text);
+    manager.speakResponse(text, true);
   }, [manager]);
 
   const stopOutput = useCallback(() => {

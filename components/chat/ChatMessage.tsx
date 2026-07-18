@@ -12,9 +12,7 @@ export interface ChatMessageProps {
   isStreaming?: boolean;
 }
 
-export const ChatMessage = memo(function ChatMessage({ role, content, isStreaming = false }: ChatMessageProps) {
-  const isUser = role === 'user';
-  
+const MessageVoiceControl = memo(function MessageVoiceControl({ content, isStreaming }: { content: string, isStreaming: boolean }) {
   const { state, speak, stopOutput, pauseOutput, resumeOutput } = useVoice();
   const [isThisMessageSpeaking, setIsThisMessageSpeaking] = useState(false);
 
@@ -34,6 +32,56 @@ export const ChatMessage = memo(function ChatMessage({ role, content, isStreamin
     stopOutput();
     setIsThisMessageSpeaking(false);
   };
+
+  if (isStreaming) return null;
+
+  return (
+    <div className="mt-3 flex items-center gap-1.5 border-t border-violet-500/10 pt-2">
+      {!isThisMessageSpeaking ? (
+        <button 
+          onClick={handleListen}
+          className="flex items-center gap-1.5 text-[10px] font-medium text-violet-300 hover:text-white bg-violet-500/10 hover:bg-violet-500/20 px-2.5 py-1.5 rounded-lg transition-colors duration-200"
+          aria-label="Listen to AI response"
+        >
+          <Volume2 className="w-3.5 h-3.5" />
+          Listen
+        </button>
+      ) : (
+        <div className="flex items-center gap-1.5 bg-violet-500/10 px-2 py-1 rounded-lg border border-violet-500/20 animate-fade-in-up">
+          <button
+            onClick={state === 'paused' ? resumeOutput : pauseOutput}
+            className="flex items-center gap-1 text-[10px] font-medium text-violet-300 hover:text-white hover:bg-violet-500/20 px-2 py-1.5 rounded-md transition-colors"
+            aria-label={state === 'paused' ? "Resume AI voice" : "Pause AI voice"}
+          >
+            {state === 'paused' ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+            {state === 'paused' ? 'Resume' : 'Pause'}
+          </button>
+          <div className="w-px h-3 bg-violet-500/20 mx-0.5"></div>
+          <button
+            onClick={handleClose}
+            className="flex items-center gap-1 text-[10px] font-medium text-red-300 hover:text-red-200 hover:bg-red-500/20 px-2 py-1.5 rounded-md transition-colors"
+            aria-label="Stop AI voice"
+          >
+            <Square className="w-3.5 h-3.5" />
+            Stop
+          </button>
+          <div className="w-px h-3 bg-violet-500/20 mx-0.5"></div>
+          <button
+            onClick={handleClose}
+            className="flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-white hover:bg-white/10 px-2 py-1.5 rounded-md transition-colors"
+            aria-label="Close voice controls"
+          >
+            <X className="w-3.5 h-3.5" />
+            Close
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
+
+export const ChatMessage = memo(function ChatMessage({ role, content, isStreaming = false }: ChatMessageProps) {
+  const isUser = role === 'user';
 
   if (!content) return null;
 
@@ -66,49 +114,7 @@ export const ChatMessage = memo(function ChatMessage({ role, content, isStreamin
         )}
 
         {/* Voice Controls */}
-        {!isUser && !isStreaming && (
-          <div className="mt-3 flex items-center gap-1.5 border-t border-violet-500/10 pt-2">
-            {!isThisMessageSpeaking ? (
-              <button 
-                onClick={handleListen}
-                className="flex items-center gap-1.5 text-[10px] font-medium text-violet-300 hover:text-white bg-violet-500/10 hover:bg-violet-500/20 px-2.5 py-1.5 rounded-lg transition-colors duration-200"
-                aria-label="Listen to AI response"
-              >
-                <Volume2 className="w-3.5 h-3.5" />
-                Listen
-              </button>
-            ) : (
-              <div className="flex items-center gap-1.5 bg-violet-500/10 px-2 py-1 rounded-lg border border-violet-500/20 animate-fade-in-up">
-                <button
-                  onClick={state === 'paused' ? resumeOutput : pauseOutput}
-                  className="flex items-center gap-1 text-[10px] font-medium text-violet-300 hover:text-white hover:bg-violet-500/20 px-2 py-1.5 rounded-md transition-colors"
-                  aria-label={state === 'paused' ? "Resume AI voice" : "Pause AI voice"}
-                >
-                  {state === 'paused' ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-                  {state === 'paused' ? 'Resume' : 'Pause'}
-                </button>
-                <div className="w-px h-3 bg-violet-500/20 mx-0.5"></div>
-                <button
-                  onClick={handleClose}
-                  className="flex items-center gap-1 text-[10px] font-medium text-red-300 hover:text-red-200 hover:bg-red-500/20 px-2 py-1.5 rounded-md transition-colors"
-                  aria-label="Stop AI voice"
-                >
-                  <Square className="w-3.5 h-3.5" />
-                  Stop
-                </button>
-                <div className="w-px h-3 bg-violet-500/20 mx-0.5"></div>
-                <button
-                  onClick={handleClose}
-                  className="flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-white hover:bg-white/10 px-2 py-1.5 rounded-md transition-colors"
-                  aria-label="Close voice controls"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  Close
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        {!isUser && <MessageVoiceControl content={content} isStreaming={isStreaming} />}
       </div>
 
       {/* User avatar */}

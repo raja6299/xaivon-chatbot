@@ -156,29 +156,47 @@ export class VoiceManager {
     // Strip Markdown tables (very basic: lines with multiple |)
     text = text.replace(/\|.*\|/g, '');
 
-    // Strip Brackets, Parentheses (but careful not to remove standard punctuation)
-    // Actually, user said: Never read: Markdown, #, *, **, _, [], (), URLs, JSON, Code blocks, HTML, Tables, Emojis, Backticks
-    text = text.replace(/[\[\]\(\)#*_`]/g, '');
+    // Strip Markdown symbols, Brackets, Parentheses
+    text = text.replace(/[\[\]\(\)#*_`~]/g, '');
+    
+    // Strip bullet symbols
+    text = text.replace(/^\s*[-+]\s+/gm, '');
 
     // Remove Emojis (matching emoji ranges)
     text = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}]/gu, '');
 
     // Improve natural pauses for TTS
-    text = text.replace(/;/g, ',');
+    text = text.replace(/;/g, ', ');
     text = text.replace(/ - /g, ', ');
     text = text.replace(/--/g, ', ');
+    text = text.replace(/:/g, ', ');
 
     // Remove extra whitespace
     return text.replace(/\s{2,}/g, ' ').trim();
   }
 
-  speakResponse(rawText: string) {
-    if (!this.settings.autoSpeak || this.settings.isMuted) return;
+  speakResponse(rawText: string, force: boolean = false) {
+    if (!force && (!this.settings.autoSpeak || this.settings.isMuted)) return;
 
     const cleanText = this.cleanSpeechText(rawText);
     if (!cleanText) return;
 
-    this.speechQueue.push(cleanText);
+    // Chunk long text for smoother playback and to avoid TTS limits on some engines
+    if (cleanText.length > 250) {
+      // Split naturally by sentence ending (. ! ?) followed by space or end of string
+      const chunks = cleanText.match(/[^.!?]+[.!?]+(\s|$)|[^.!?]+$/g);
+      if (chunks && chunks.length > 0) {
+        chunks.forEach(chunk => {
+          const trimmed = chunk.trim();
+          if (trimmed) this.speechQueue.push(trimmed);
+        });
+      } else {
+        this.speechQueue.push(cleanText);
+      }
+    } else {
+      this.speechQueue.push(cleanText);
+    }
+    
     this.processQueue();
   }
 
