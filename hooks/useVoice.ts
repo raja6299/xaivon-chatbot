@@ -85,6 +85,6 @@ export function useVoice(onResult?: (text: string, isFinal: boolean) => void) {
     resumeOutput,
     updateSettings,
     dismissError,
-    getAvailableVoices: () => manager.getAvailableVoices(),
+    getAvailableVoices: useCallback(() => manager.getAvailableVoices(), [manager]),
   };
 }

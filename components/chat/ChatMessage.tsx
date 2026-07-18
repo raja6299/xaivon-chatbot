@@ -1,10 +1,10 @@
 "use client";
 
-import React, { memo, useState, useEffect } from 'react';
+import React, { memo, useState, useEffect, useCallback, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Play, Pause, Square, X, Volume2 } from 'lucide-react';
-import { useVoice } from '../../hooks/useVoice';
+import { getVoiceManager } from '../../lib/voice/VoiceManager';
 
 export interface ChatMessageProps {
   role: 'user' | 'assistant';
@@ -13,31 +13,67 @@ export interface ChatMessageProps {
 }
 
 const MessageVoiceControl = memo(function MessageVoiceControl({ content, isStreaming }: { content: string, isStreaming: boolean }) {
-  const { state, speak, stopOutput, pauseOutput, resumeOutput } = useVoice();
-  const [isThisMessageSpeaking, setIsThisMessageSpeaking] = useState(false);
+  const [playState, setPlayState] = useState<'idle' | 'playing' | 'paused'>('idle');
+  const unsubRef = useRef<(() => void) | null>(null);
 
+  // Cleanup subscription on unmount
   useEffect(() => {
-    if (state === 'idle' || state === 'error' || state === 'completed') {
-      setIsThisMessageSpeaking(false);
+    return () => {
+      if (unsubRef.current) {
+        unsubRef.current();
+        unsubRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleListen = useCallback(() => {
+    const manager = getVoiceManager();
+    manager.interruptOutput(); // Stop any ongoing speech
+
+    // Subscribe to state ONLY while this message is speaking
+    if (unsubRef.current) unsubRef.current();
+    unsubRef.current = manager.subscribeToState((s) => {
+      if (s === 'idle' || s === 'error' || s === 'completed') {
+        setPlayState('idle');
+        if (unsubRef.current) {
+          unsubRef.current();
+          unsubRef.current = null;
+        }
+      } else if (s === 'paused') {
+        setPlayState('paused');
+      } else if (s === 'speaking') {
+        setPlayState('playing');
+      }
+    });
+
+    manager.speakResponse(content, true);
+    setPlayState('playing');
+  }, [content]);
+
+  const handlePauseResume = useCallback(() => {
+    const manager = getVoiceManager();
+    if (playState === 'paused') {
+      manager.resumeOutput();
+    } else {
+      manager.pauseOutput();
     }
-  }, [state]);
+  }, [playState]);
 
-  const handleListen = () => {
-    stopOutput(); // Clear any ongoing speech
-    speak(content);
-    setIsThisMessageSpeaking(true);
-  };
-
-  const handleClose = () => {
-    stopOutput();
-    setIsThisMessageSpeaking(false);
-  };
+  const handleClose = useCallback(() => {
+    const manager = getVoiceManager();
+    manager.interruptOutput();
+    setPlayState('idle');
+    if (unsubRef.current) {
+      unsubRef.current();
+      unsubRef.current = null;
+    }
+  }, []);
 
   if (isStreaming) return null;
 
   return (
     <div className="mt-3 flex items-center gap-1.5 border-t border-violet-500/10 pt-2">
-      {!isThisMessageSpeaking ? (
+      {playState === 'idle' ? (
         <button 
           onClick={handleListen}
           className="flex items-center gap-1.5 text-[10px] font-medium text-violet-300 hover:text-white bg-violet-500/10 hover:bg-violet-500/20 px-2.5 py-1.5 rounded-lg transition-colors duration-200"
@@ -49,12 +85,12 @@ const MessageVoiceControl = memo(function MessageVoiceControl({ content, isStrea
       ) : (
         <div className="flex items-center gap-1.5 bg-violet-500/10 px-2 py-1 rounded-lg border border-violet-500/20 animate-fade-in-up">
           <button
-            onClick={state === 'paused' ? resumeOutput : pauseOutput}
+            onClick={handlePauseResume}
             className="flex items-center gap-1 text-[10px] font-medium text-violet-300 hover:text-white hover:bg-violet-500/20 px-2 py-1.5 rounded-md transition-colors"
-            aria-label={state === 'paused' ? "Resume AI voice" : "Pause AI voice"}
+            aria-label={playState === 'paused' ? "Resume AI voice" : "Pause AI voice"}
           >
-            {state === 'paused' ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-            {state === 'paused' ? 'Resume' : 'Pause'}
+            {playState === 'paused' ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+            {playState === 'paused' ? 'Resume' : 'Pause'}
           </button>
           <div className="w-px h-3 bg-violet-500/20 mx-0.5"></div>
           <button
