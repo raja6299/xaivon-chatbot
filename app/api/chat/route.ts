@@ -1,9 +1,8 @@
 import { groq } from '@ai-sdk/groq';
-import { streamText, convertToModelMessages } from 'ai';
+import { streamText, convertToModelMessages, jsonSchema } from 'ai';
 import { knowledgeBase } from '@/lib/knowledge-base';
 import { checkRateLimit, sanitizeInput, chatRequestSchema, logAnalytics, logSecurity } from '@/lib/security';
 import { RAGManager } from '@/lib/rag/RAGManager';
-import { z } from 'zod';
 import { integrations } from '@/lib/integrations/manager';
 
 const SYSTEM_PROMPT = `You are XAIVON's Enterprise Solutions Consultant — a knowledgeable, professional AI assistant embedded on the XAIVON website.
@@ -207,9 +206,7 @@ export async function POST(req: Request) {
           sanitized.content = sanitizeInput(m.content);
         }
         
-        // Polyfill `.parts` if missing. The Vercel AI SDK convertToModelMessages strictly 
-        // iterates over message.parts. Old localStorage sessions or basic UIMessage payloads 
-        // might lack this array, which caused the 'Cannot read properties of undefined' crash.
+        // Polyfill `.parts` if missing for convertToModelMessages compatibility
         if (!sanitized.parts && typeof sanitized.content === 'string') {
           sanitized.parts = [{ type: 'text', text: sanitized.content }];
         }
@@ -286,8 +283,13 @@ export async function POST(req: Request) {
       tools: {
         sendSlackNotification: {
           description: 'Send a message to the internal Slack team to notify them of an important event, high-value lead, or support request.',
-          inputSchema: z.object({
-            message: z.string().describe('The notification message to send to Slack.'),
+          inputSchema: jsonSchema({
+            type: 'object',
+            properties: {
+              message: { type: 'string', description: 'The notification message to send to Slack.' },
+            },
+            required: ['message'],
+            additionalProperties: false,
           }),
           execute: async ({ message }: { message: string }) => {
             const jobId = integrations.trigger('slack', { message });
@@ -296,11 +298,16 @@ export async function POST(req: Request) {
         },
         syncHubSpotCRM: {
           description: 'Create or update a contact in HubSpot CRM.',
-          inputSchema: z.object({
-            email: z.string().email(),
-            firstName: z.string().optional(),
-            lastName: z.string().optional(),
-            company: z.string().optional(),
+          inputSchema: jsonSchema({
+            type: 'object',
+            properties: {
+              email: { type: 'string', description: 'Contact email address' },
+              firstName: { type: 'string', description: 'Contact first name' },
+              lastName: { type: 'string', description: 'Contact last name' },
+              company: { type: 'string', description: 'Contact company name' },
+            },
+            required: ['email'],
+            additionalProperties: false,
           }),
           execute: async (contactDetails: Record<string, unknown>) => {
             const jobId = integrations.trigger('hubspot', contactDetails);
@@ -309,9 +316,14 @@ export async function POST(req: Request) {
         },
         triggerZapierWebhook: {
           description: 'Trigger a custom Zapier workflow via Webhook.',
-          inputSchema: z.object({
-            url: z.string().url().describe('The Zapier Webhook URL'),
-            payload: z.string().describe('The JSON string payload to send to Zapier'),
+          inputSchema: jsonSchema({
+            type: 'object',
+            properties: {
+              url: { type: 'string', description: 'The Zapier Webhook URL' },
+              payload: { type: 'string', description: 'The JSON string payload to send to Zapier' },
+            },
+            required: ['url', 'payload'],
+            additionalProperties: false,
           }),
           execute: async ({ url, payload }: { url: string; payload: string }) => {
             let data: Record<string, unknown> = {};
