@@ -229,7 +229,7 @@ export async function POST(req: Request) {
       const msg = m as { experimental_attachments?: Array<{ contentType?: string }> };
       return msg.experimental_attachments && msg.experimental_attachments.some(a => a.contentType?.startsWith('image/'));
     });
-    const modelId = hasImage ? 'llama-3.2-90b-vision-preview' : 'llama-3.3-70b-versatile';
+    const modelId = hasImage ? 'llama-3.2-90b-vision-preview' : 'llama-3.1-8b-instant';
 
     // 5. RAG Retrieval
     const lastUserMessage = sanitizedMessages.filter(m => m.role === 'user').pop();
