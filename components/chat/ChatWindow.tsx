@@ -148,10 +148,10 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
     if (messagesContainerRef.current && isScrolledToBottomRef.current) {
       messagesContainerRef.current.scrollTo({
         top: messagesContainerRef.current.scrollHeight,
-        behavior: 'smooth',
+        behavior: status === 'streaming' ? 'auto' : 'smooth',
       });
     }
-  }, [messages, isLoading]);
+  }, [messages, status]);
 
   // Load chat history & session on mount (Persistence)
   useEffect(() => {
@@ -550,7 +550,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
         )}
 
         {/* Typing Indicator */}
-        {isLoading && (
+        {status === 'submitted' && (
           <div className="flex items-start gap-2.5 animate-fade-in-up">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5">X</div>
             <div className="flex gap-1 items-center px-4 py-3 bg-[#151d35] border border-violet-500/8 rounded-2xl rounded-tl-sm">
