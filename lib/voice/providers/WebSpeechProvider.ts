@@ -68,6 +68,9 @@ export class WebSpeechProvider implements VoiceProvider {
 
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interimTranscript = '';
+      
+      console.log(`[STT FORENSIC] --- ONRESULT EVENT ---`);
+      console.log(`[STT FORENSIC] resultIndex=${event.resultIndex} resultsLength=${event.results.length}`);
 
       // If the browser cleared the results array, reset our index tracker
       if (event.results.length <= lastProcessedResultIndex) {
@@ -76,6 +79,9 @@ export class WebSpeechProvider implements VoiceProvider {
 
       for (let i = 0; i < event.results.length; ++i) {
         const result = event.results[i];
+        
+        console.log(`[STT FORENSIC] index=${i} isFinal=${result.isFinal} transcript="${result[0].transcript}"`);
+        
         if (result.isFinal) {
           // Only append if we haven't processed this exact index yet
           if (i > lastProcessedResultIndex) {
@@ -89,7 +95,13 @@ export class WebSpeechProvider implements VoiceProvider {
         }
       }
 
+      console.log(`[STT FORENSIC] finalTranscript="${finalTranscript}"`);
+      console.log(`[STT FORENSIC] interimTranscript="${interimTranscript}"`);
+
       const fullText = (finalTranscript + interimTranscript).trim();
+      
+      console.log(`[STT FORENSIC] output="${fullText}"`);
+      
       if (fullText) {
         // We pass false for isFinal because in continuous mode, we don't want to 
         // prematurely trigger submission on every sentence boundary.
