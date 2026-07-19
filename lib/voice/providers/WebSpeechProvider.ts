@@ -64,38 +64,39 @@ export class WebSpeechProvider implements VoiceProvider {
     }
 
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let rebuiltFinal = '';
+      let finalParts: string[] = [];
       let interimTranscript = '';
 
-      // Always iterate from index 0, NOT event.resultIndex.
-      //
-      // Android Chrome STT behavior is different from Desktop Chrome:
-      // On Android, every onresult event replaces the ENTIRE results array
-      // with a fresh cumulative snapshot, and marks all results isFinal=true.
-      // Example for "India ka capital kya hai?":
-      //   Event 1: results[0]="India"             isFinal=true
-      //   Event 2: results[0]="India ka"          isFinal=true
-      //   Event 3: results[0]="India ka capital"  isFinal=true
-      //
-      // The OLD code used an external `finalTranscript` accumulator:
-      //   finalTranscript += "India"           → "India "
-      //   finalTranscript += "India ka"        → "India India ka "
-      //   finalTranscript += "India ka capital"→ "India India ka India ka capital "
-      // This caused the duplication bug.
-      //
-      // The FIX: reconstruct the full transcript fresh from event.results on
-      // every event. Android already sends the complete accumulated text —
-      // do not append externally.
+      // The FIX: deterministic overlap-based deduplication
+      // Android Chrome STT behaves cumulatively (e.g., results[0]="India", results[1]="India ka")
+      // Desktop Chrome behaves discretely (e.g., results[0]="India", results[1]="ka")
       for (let i = 0; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript.trim();
+        if (!transcript) continue;
+
         if (event.results[i].isFinal) {
-          rebuiltFinal += event.results[i][0].transcript + ' ';
+          if (finalParts.length > 0) {
+            const lastPart = finalParts[finalParts.length - 1];
+            // Check if this new transcript is just a cumulative extension of the LAST part.
+            // Example: lastPart="India", transcript="India ka" -> TRUE
+            // Example: lastPart="very", transcript="very" (Desktop repeating word) -> FALSE
+            if (transcript.toLowerCase().startsWith(lastPart.toLowerCase()) && transcript.length > lastPart.length) {
+              // It's a cumulative update (Android behavior) - replace the last part
+              finalParts[finalParts.length - 1] = transcript;
+            } else {
+              // It's a new discrete word/phrase (Desktop behavior, Android new sentence, or repeated word)
+              finalParts.push(transcript);
+            }
+          } else {
+            finalParts.push(transcript);
+          }
         } else {
           // Overwrite — only keep the latest interim hypothesis.
-          interimTranscript = event.results[i][0].transcript;
+          interimTranscript = transcript;
         }
       }
 
-      const fullText = (rebuiltFinal + interimTranscript).trim();
+      const fullText = [...finalParts, interimTranscript].filter(Boolean).join(' ').trim();
       if (fullText) {
         onResult(fullText, false);
       }
