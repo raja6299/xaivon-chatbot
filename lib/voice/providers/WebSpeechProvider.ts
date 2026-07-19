@@ -63,48 +63,23 @@ export class WebSpeechProvider implements VoiceProvider {
       return;
     }
 
-    let finalTranscript = ''; // Persists across onresult events for this session
-    let lastProcessedResultIndex = -1; // Tracks which results have been finalized
-
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let rebuiltFinal = '';
       let interimTranscript = '';
-      
-      console.log(`[STT FORENSIC] --- ONRESULT EVENT ---`);
-      console.log(`[STT FORENSIC] resultIndex=${event.resultIndex} resultsLength=${event.results.length}`);
 
-      // If the browser cleared the results array, reset our index tracker
-      if (event.results.length <= lastProcessedResultIndex) {
-        lastProcessedResultIndex = -1;
-      }
-
-      for (let i = 0; i < event.results.length; ++i) {
-        const result = event.results[i];
-        
-        console.log(`[STT FORENSIC] index=${i} isFinal=${result.isFinal} transcript="${result[0].transcript}"`);
-        
-        if (result.isFinal) {
-          // Only append if we haven't processed this exact index yet
-          if (i > lastProcessedResultIndex) {
-            finalTranscript += result[0].transcript + ' ';
-            lastProcessedResultIndex = i;
-          }
+      // Always iterate from 0, not event.resultIndex.
+      // Android Chrome replaces the entire results array on each event with a
+      // fresh cumulative snapshot — do not append externally.
+      for (let i = 0; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          rebuiltFinal += event.results[i][0].transcript + ' ';
         } else {
-          // Overwrite to get the latest interim hypothesis for this chunk.
-          // This fixes Android Chrome pushing cumulative non-final results.
-          interimTranscript = result[0].transcript;
+          interimTranscript = event.results[i][0].transcript;
         }
       }
 
-      console.log(`[STT FORENSIC] finalTranscript="${finalTranscript}"`);
-      console.log(`[STT FORENSIC] interimTranscript="${interimTranscript}"`);
-
-      const fullText = (finalTranscript + interimTranscript).trim();
-      
-      console.log(`[STT FORENSIC] output="${fullText}"`);
-      
+      const fullText = (rebuiltFinal + interimTranscript).trim();
       if (fullText) {
-        // We pass false for isFinal because in continuous mode, we don't want to 
-        // prematurely trigger submission on every sentence boundary.
         onResult(fullText, false);
       }
     };
