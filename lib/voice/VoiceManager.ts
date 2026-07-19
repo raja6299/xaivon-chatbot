@@ -118,13 +118,9 @@ export class VoiceManager {
       this.silenceTimer = null;
     }
     this.provider.stopListening();
-    this.setState('idle');
-    
-    // Emit the final accumulated text to trigger submission
-    if (this.currentText) {
-      this.textListeners.forEach(l => l(this.currentText, true));
-      this.currentText = '';
-    }
+    // Let the provider's natural onend callback handle state transition to 'idle'
+    // and emit the final text. This prevents duplicate emissions if late onresult
+    // events arrive after stopListening is called.
   }
 
   abortListening() {
