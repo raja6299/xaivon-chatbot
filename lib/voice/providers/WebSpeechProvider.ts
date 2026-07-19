@@ -63,16 +63,20 @@ export class WebSpeechProvider implements VoiceProvider {
       return;
     }
 
+    let finalTranscript = ''; // Persisted across onresult events for this session
+
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let finalTranscript = '';
       let interimTranscript = '';
 
-      // Accumulate ALL results from the beginning of the continuous session
-      for (let i = 0; i < event.results.length; ++i) {
+      // Process only new results starting from event.resultIndex
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
           finalTranscript += event.results[i][0].transcript + ' ';
         } else {
-          interimTranscript += event.results[i][0].transcript;
+          // OVERWRITE interim transcript instead of appending.
+          // This fixes a major Android Chrome bug where multiple interim results 
+          // are pushed to the array, causing severe text duplication.
+          interimTranscript = event.results[i][0].transcript;
         }
       }
 
