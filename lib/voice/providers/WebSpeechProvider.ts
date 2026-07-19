@@ -64,31 +64,53 @@ export class WebSpeechProvider implements VoiceProvider {
     }
 
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const parts: string[] = [];
+      // ARCHITECTURE: Separate finals from interim completely.
+      //
+      // Desktop Chrome: each result slot is a discrete word/phrase.
+      //   finals = ["hi", "XAIVON", "kya hai"], interim = "matlab"
+      //   output = "hi XAIVON kya hai matlab"
+      //
+      // Android Chrome: results array grows cumulatively AND interim
+      //   results are cumulative extensions of finals.
+      //   finals = ["hi XAIVON kya hai"], interim = "hi XAIVON kya hai matlab"
+      //   Without fix: "hi XAIVON kya hai hi XAIVON kya hai matlab" <- DUPLICATE
+      //   With fix: detect interim starts with finalText -> use interim alone
 
-      // The FIX: deterministic overlap-based deduplication for BOTH final and interim results
-      // Android Chrome STT behaves cumulatively across both final and interim results
-      // Desktop Chrome behaves discretely
+      let finalText = '';
+      let interimText = '';
+
       for (let i = 0; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript.trim();
         if (!transcript) continue;
 
-        if (parts.length > 0) {
-          const lastPart = parts[parts.length - 1];
-          // Check if this new transcript is just a cumulative extension of the LAST part.
-          if (transcript.toLowerCase().startsWith(lastPart.toLowerCase()) && transcript.length > lastPart.length) {
-            // It's a cumulative update (Android behavior) - replace the last part
-            parts[parts.length - 1] = transcript;
-          } else {
-            // It's a new discrete word/phrase (Desktop behavior, Android new sentence, or repeated word)
-            parts.push(transcript);
-          }
+        if (event.results[i].isFinal) {
+          // Append discrete final words (Desktop) or cumulative sentence (Android)
+          finalText = finalText ? finalText + ' ' + transcript : transcript;
         } else {
-          parts.push(transcript);
+          // Always overwrite — only the latest interim hypothesis matters
+          interimText = transcript;
         }
       }
 
-      const fullText = parts.filter(Boolean).join(' ').trim();
+      // KEY FIX: On Android, interim is a cumulative extension of finals.
+      // If interimText already contains/extends finalText, use interim alone.
+      // This prevents: "hi XAIVON" + "hi XAIVON kya" = "hi XAIVON hi XAIVON kya"
+      let fullText: string;
+      if (interimText && finalText) {
+        const lf = finalText.toLowerCase().trim();
+        const li = interimText.toLowerCase().trim();
+        if (li.startsWith(lf)) {
+          // Android cumulative interim — it already contains the finals
+          fullText = interimText;
+        } else {
+          // Desktop discrete — join finals + current interim
+          fullText = finalText + ' ' + interimText;
+        }
+      } else {
+        fullText = finalText || interimText;
+      }
+
+      fullText = fullText.trim();
       if (fullText) {
         onResult(fullText, false);
       }
