@@ -34,9 +34,7 @@ export const metadata: Metadata = {
     title: "XAIVON | AI Solutions Consultant",
     description: "Enterprise AI automation and intelligent workflow solutions.",
   },
-  icons: {
-    icon: "/favicon.ico",
-  },
+
 };
 
 export const viewport: Viewport = {

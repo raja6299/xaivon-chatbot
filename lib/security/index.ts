@@ -56,11 +56,11 @@ export const chatRequestSchema = z.object({
       role: z.enum(['user', 'assistant', 'system']),
       content: z.union([
         z.string().max(10000),
-        z.array(z.any())
-      ]),
-      parts: z.array(z.any()).optional(),
+        z.array(z.any()).max(20)
+      ]).optional(),
+      parts: z.array(z.any()).max(20).optional(),
       id: z.string().optional(),
-    })
+    }).passthrough()
   ).max(50),
   sessionId: z.string().optional(),
 });
