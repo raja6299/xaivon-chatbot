@@ -51,7 +51,17 @@ export function sanitizeInput(input: string): string {
 // ZOD SCHEMAS
 // ==========================================
 export const chatRequestSchema = z.object({
-  messages: z.array(z.any()).max(500),
+  messages: z.array(
+    z.object({
+      role: z.enum(['user', 'assistant', 'system']),
+      content: z.union([
+        z.string().max(10000),
+        z.array(z.any())
+      ]),
+      parts: z.array(z.any()).optional(),
+      id: z.string().optional(),
+    })
+  ).max(50),
   sessionId: z.string().optional(),
 });
 
@@ -100,7 +110,7 @@ async function persistLog(action: string, severity: 'info' | 'warning' | 'error'
 }
 
 export function logAnalytics(event: string, data: Record<string, unknown>) {
-  console.log(`[Analytics] [${event}]`, JSON.stringify(data));
+  // Analytics event: removed verbose production logging
   persistLog(event, 'info', data);
 }
 

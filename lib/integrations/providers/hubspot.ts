@@ -12,7 +12,7 @@ export class HubSpotProvider implements IntegrationProvider {
     const HUBSPOT_API_KEY = process.env.HUBSPOT_API_KEY;
     
     if (!HUBSPOT_API_KEY) {
-      console.log('Mock HubSpot CRM Sync:', payload);
+      // Mock HubSpot: would sync contact in production
       return {
         success: true,
         providerId: this.id,

@@ -12,7 +12,7 @@ export class SlackProvider implements IntegrationProvider {
     
     if (!SLACK_WEBHOOK_URL) {
       // Mock success if no webhook URL is configured to prevent breaking chat
-      console.log('Mock Slack Notification Sent:', payload.message);
+      // Mock Slack: would send notification in production
       return {
         success: true,
         providerId: this.id,

@@ -324,7 +324,7 @@ export async function POST(req: Request) {
     const contextSafeMessages = prepareConversationContext(sanitizedMessages);
 
     // Save User message to Supabase
-    if (sessionId && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    if (sessionId && process.env.SUPABASE_SERVICE_ROLE_KEY && lastUserMessage) {
       try {
         const { createClient } = await import('@supabase/supabase-js');
         const supabaseAdmin = createClient(

@@ -14,8 +14,29 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "XAIVON - AI Chatbot",
-  description: "Welcome to XAIVON: Your Intelligent Architect Assistant",
+  title: "XAIVON | AI Solutions Consultant",
+  description:
+    "XAIVON is an enterprise AI solutions platform offering automation, intelligent workflows, and AI-powered consulting for logistics and hospitality businesses.",
+  keywords: ["AI automation", "enterprise AI", "AI chatbot", "business automation", "XAIVON"],
+  authors: [{ name: "XAIVON" }],
+  robots: { index: true, follow: true },
+  openGraph: {
+    title: "XAIVON | AI Solutions Consultant",
+    description:
+      "Enterprise AI automation and intelligent workflow solutions. Talk to our AI consultant and discover what's possible.",
+    url: "https://xaivon-chatbot.vercel.app",
+    siteName: "XAIVON",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "XAIVON | AI Solutions Consultant",
+    description: "Enterprise AI automation and intelligent workflow solutions.",
+  },
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export const viewport: Viewport = {

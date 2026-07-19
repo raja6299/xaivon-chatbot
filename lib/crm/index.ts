@@ -190,18 +190,7 @@ export async function processLeadForCRM(
   
   // "Do NOT show this summary to users. Internal use only."
   // Simulate pushing to an internal CRM by logging securely on the backend.
-  console.log('--- ENTERPRISE CRM PAYLOAD GENERATED ---');
-  console.log(`Company: ${crmPayload.leadInformation.company}`);
-  console.log(`Industry: ${crmPayload.businessInformation.industry}`);
-  console.log(`Pain Point: ${crmPayload.businessInformation.painPoints.join(', ') || 'None identified'}`);
-  console.log(`Interest: ${crmPayload.intentLevel}`);
-  console.log(`Timeline: ${crmPayload.businessInformation.timeline}`);
-  console.log(`Recommended Solution: ${crmPayload.recommendedService}`);
-  console.log(`Lead Score: ${crmPayload.leadScore}`);
-  console.log(`Escalation: ${crmPayload.escalationStatus} (Reason: ${crmPayload.handoffReason})`);
-  console.log(`Meeting: ${crmPayload.meetingRequested ? crmPayload.meetingType : 'None'}`);
-  console.log(`Priority: ${crmPayload.priority}`);
-  console.log('----------------------------------------');
+
 
   return crmPayload;
 }
