@@ -67,13 +67,30 @@ export class WebSpeechProvider implements VoiceProvider {
       let rebuiltFinal = '';
       let interimTranscript = '';
 
-      // Always iterate from 0, not event.resultIndex.
-      // Android Chrome replaces the entire results array on each event with a
-      // fresh cumulative snapshot — do not append externally.
+      // Always iterate from index 0, NOT event.resultIndex.
+      //
+      // Android Chrome STT behavior is different from Desktop Chrome:
+      // On Android, every onresult event replaces the ENTIRE results array
+      // with a fresh cumulative snapshot, and marks all results isFinal=true.
+      // Example for "India ka capital kya hai?":
+      //   Event 1: results[0]="India"             isFinal=true
+      //   Event 2: results[0]="India ka"          isFinal=true
+      //   Event 3: results[0]="India ka capital"  isFinal=true
+      //
+      // The OLD code used an external `finalTranscript` accumulator:
+      //   finalTranscript += "India"           → "India "
+      //   finalTranscript += "India ka"        → "India India ka "
+      //   finalTranscript += "India ka capital"→ "India India ka India ka capital "
+      // This caused the duplication bug.
+      //
+      // The FIX: reconstruct the full transcript fresh from event.results on
+      // every event. Android already sends the complete accumulated text —
+      // do not append externally.
       for (let i = 0; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
           rebuiltFinal += event.results[i][0].transcript + ' ';
         } else {
+          // Overwrite — only keep the latest interim hypothesis.
           interimTranscript = event.results[i][0].transcript;
         }
       }
