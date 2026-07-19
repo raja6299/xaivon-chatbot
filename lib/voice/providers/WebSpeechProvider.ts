@@ -63,20 +63,29 @@ export class WebSpeechProvider implements VoiceProvider {
       return;
     }
 
-    let finalTranscript = ''; // Persisted across onresult events for this session
+    let finalTranscript = ''; // Persists across onresult events for this session
+    let lastProcessedResultIndex = -1; // Tracks which results have been finalized
 
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interimTranscript = '';
 
-      // Process only new results starting from event.resultIndex
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript + ' ';
+      // If the browser cleared the results array, reset our index tracker
+      if (event.results.length <= lastProcessedResultIndex) {
+        lastProcessedResultIndex = -1;
+      }
+
+      for (let i = 0; i < event.results.length; ++i) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          // Only append if we haven't processed this exact index yet
+          if (i > lastProcessedResultIndex) {
+            finalTranscript += result[0].transcript + ' ';
+            lastProcessedResultIndex = i;
+          }
         } else {
-          // OVERWRITE interim transcript instead of appending.
-          // This fixes a major Android Chrome bug where multiple interim results 
-          // are pushed to the array, causing severe text duplication.
-          interimTranscript = event.results[i][0].transcript;
+          // Overwrite to get the latest interim hypothesis for this chunk.
+          // This fixes Android Chrome pushing cumulative non-final results.
+          interimTranscript = result[0].transcript;
         }
       }
 
