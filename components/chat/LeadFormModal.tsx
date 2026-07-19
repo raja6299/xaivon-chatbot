@@ -428,7 +428,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
       aria-label="Schedule a free consultation"
     >
       <div ref={modalRef} className="w-full max-w-[340px] mx-3 animate-slide-up">
-        <div className="bg-[#111827]/95 border border-violet-500/20 rounded-2xl shadow-2xl shadow-violet-500/5 overflow-hidden">
+        <div className="bg-[#111827]/95 border border-violet-500/20 rounded-2xl shadow-2xl shadow-violet-500/5">
           {/* ---- Header -------------------------------------------------- */}
           <div className="px-5 pt-5 pb-3 border-b border-violet-500/10">
             <div className="flex items-center justify-between">
@@ -459,7 +459,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
           </div>
 
           {/* ---- Body ---------------------------------------------------- */}
-          <div className="px-5 py-4 max-h-[55vh] overflow-y-auto scrollbar-thin">
+          <div className="px-5 py-4 max-h-[55vh] overflow-y-auto overflow-x-visible scrollbar-thin">
             {formStatus === 'success' ? (
               <div className="text-center py-6 animate-fade-in-up">
                 <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/15 border border-emerald-500/20 flex items-center justify-center mb-3">
@@ -627,7 +627,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                   >
                     {t('form.phone')}
                   </label>
-                  <div className="relative">
+                  <div className="relative" style={{ overflow: 'visible' }}>
                     <PhoneInput
                       id="lead-phone"
                       name="phone"
@@ -637,7 +637,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                       disabled={formStatus === 'submitting'}
                       placeholder="+1 (555) 000-0000"
                       defaultCountry="US"
-                      className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2 pr-9 placeholder-slate-600 transition-all duration-200 outline-none border ${inputBorderClass('phone')} disabled:opacity-40 [&_.PhoneInputCountryIcon]:w-6 [&_.PhoneInputCountryIcon]:h-4 [&_.PhoneInputCountryIcon--border]:border-none [&_.PhoneInputInput]:bg-transparent [&_.PhoneInputInput]:outline-none [&_.PhoneInputInput]:text-white`}
+                      className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2 pr-9 placeholder-slate-600 transition-all duration-200 outline-none border ${inputBorderClass('phone')} disabled:opacity-40 [&_.PhoneInputCountryIcon]:w-6 [&_.PhoneInputCountryIcon]:h-4 [&_.PhoneInputCountryIcon--border]:border-none [&_.PhoneInputInput]:bg-transparent [&_.PhoneInputInput]:outline-none [&_.PhoneInputInput]:text-white [&_.PhoneInputCountrySelect]:bg-[#1a2035] [&_.PhoneInputCountrySelect]:text-white [&_.PhoneInputCountrySelect]:border-0 [&_.PhoneInputCountrySelect]:outline-none [&_.PhoneInputCountrySelectArrow]:text-slate-400`}
                       autoComplete="tel"
                       aria-invalid={fieldState('phone') === 'invalid' || undefined}
                       aria-describedby={
