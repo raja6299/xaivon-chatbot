@@ -64,39 +64,31 @@ export class WebSpeechProvider implements VoiceProvider {
     }
 
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let finalParts: string[] = [];
-      let interimTranscript = '';
+      const parts: string[] = [];
 
-      // The FIX: deterministic overlap-based deduplication
-      // Android Chrome STT behaves cumulatively (e.g., results[0]="India", results[1]="India ka")
-      // Desktop Chrome behaves discretely (e.g., results[0]="India", results[1]="ka")
+      // The FIX: deterministic overlap-based deduplication for BOTH final and interim results
+      // Android Chrome STT behaves cumulatively across both final and interim results
+      // Desktop Chrome behaves discretely
       for (let i = 0; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript.trim();
         if (!transcript) continue;
 
-        if (event.results[i].isFinal) {
-          if (finalParts.length > 0) {
-            const lastPart = finalParts[finalParts.length - 1];
-            // Check if this new transcript is just a cumulative extension of the LAST part.
-            // Example: lastPart="India", transcript="India ka" -> TRUE
-            // Example: lastPart="very", transcript="very" (Desktop repeating word) -> FALSE
-            if (transcript.toLowerCase().startsWith(lastPart.toLowerCase()) && transcript.length > lastPart.length) {
-              // It's a cumulative update (Android behavior) - replace the last part
-              finalParts[finalParts.length - 1] = transcript;
-            } else {
-              // It's a new discrete word/phrase (Desktop behavior, Android new sentence, or repeated word)
-              finalParts.push(transcript);
-            }
+        if (parts.length > 0) {
+          const lastPart = parts[parts.length - 1];
+          // Check if this new transcript is just a cumulative extension of the LAST part.
+          if (transcript.toLowerCase().startsWith(lastPart.toLowerCase()) && transcript.length > lastPart.length) {
+            // It's a cumulative update (Android behavior) - replace the last part
+            parts[parts.length - 1] = transcript;
           } else {
-            finalParts.push(transcript);
+            // It's a new discrete word/phrase (Desktop behavior, Android new sentence, or repeated word)
+            parts.push(transcript);
           }
         } else {
-          // Overwrite — only keep the latest interim hypothesis.
-          interimTranscript = transcript;
+          parts.push(transcript);
         }
       }
 
-      const fullText = [...finalParts, interimTranscript].filter(Boolean).join(' ').trim();
+      const fullText = parts.filter(Boolean).join(' ').trim();
       if (fullText) {
         onResult(fullText, false);
       }

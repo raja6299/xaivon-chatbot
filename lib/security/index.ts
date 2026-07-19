@@ -53,7 +53,7 @@ export function sanitizeInput(input: string): string {
 export const chatRequestSchema = z.object({
   messages: z.array(
     z.object({
-      role: z.enum(['user', 'assistant', 'system']),
+      role: z.enum(['user', 'assistant', 'system', 'data', 'tool', 'function']),
       content: z.union([
         z.string().max(10000),
         z.array(z.any()).max(20)
@@ -61,7 +61,7 @@ export const chatRequestSchema = z.object({
       parts: z.array(z.any()).max(20).optional(),
       id: z.string().optional(),
     }).passthrough()
-  ).max(50),
+  ).max(100),
   sessionId: z.string().optional(),
 });
 
