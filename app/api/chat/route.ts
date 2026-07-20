@@ -92,8 +92,45 @@ export async function POST(req: Request) {
     const validationResult = chatRequestSchema.safeParse(body);
     if (!validationResult.success) {
       logSecurity('ValidationError', { ip, errors: validationResult.error.format() });
+      
+      try {
+        const payloadStr = JSON.stringify(body);
+        const payloadSnapshot = payloadStr.length > 1000 ? payloadStr.substring(0, 1000) + '...' : payloadStr;
+        
+        let firstMsgRole = 'N/A';
+        let firstMsgKeys = 'N/A';
+        let firstMsgParts = 'N/A';
+        let firstMsgContent = 'N/A';
+        
+        if (body && Array.isArray(body.messages) && body.messages.length > 0) {
+          const firstMsg = body.messages[0];
+          if (firstMsg && typeof firstMsg === 'object') {
+            firstMsgRole = firstMsg.role || 'undefined';
+            firstMsgKeys = Object.keys(firstMsg).join(', ');
+            firstMsgParts = firstMsg.parts ? JSON.stringify(firstMsg.parts) : 'undefined';
+            firstMsgContent = firstMsg.content ? (typeof firstMsg.content === 'string' ? firstMsg.content.substring(0, 100) : 'non-string') : 'undefined';
+          }
+        }
+        
+        console.error('[VALIDATION_FAILURE]', JSON.stringify({
+          requestId,
+          issues: validationResult.error.issues,
+          flatten: validationResult.error.flatten(),
+          messagesLength: body && Array.isArray(body.messages) ? body.messages.length : 'undefined',
+          firstMessage: {
+            role: firstMsgRole,
+            keys: firstMsgKeys,
+            parts: firstMsgParts,
+            content: firstMsgContent
+          },
+          payloadSnapshot
+        }, null, 2));
+      } catch (logErr) {
+        console.error('[VALIDATION_FAILURE_LOG_ERROR]', logErr);
+      }
+
       return new Response(
-        JSON.stringify({ error: 'Invalid request format or oversized payload' }),
+        JSON.stringify({ error: 'Invalid request format' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
