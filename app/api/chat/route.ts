@@ -158,44 +158,23 @@ Recommend the appropriate meeting type based on the conversation:
 
 When transitioning to a human handoff, recommend the specific meeting type and append \`[TRIGGER_LEAD_FORM]\` at the very end of your response. Do NOT mention this trigger to the user. It is invisible.
 
-## KNOWLEDGE BASE
-
-### Company Overview
-${knowledgeBase.company.name}: ${knowledgeBase.company.tagline}
-${knowledgeBase.company.description}
+## COMPANY IDENTITY
+**${knowledgeBase.company.name}** — ${knowledgeBase.company.tagline}
 Founded by ${knowledgeBase.company.founder} (${knowledgeBase.company.founderTitle})
-Website: ${knowledgeBase.company.website}
+Current focus: AI automation agency for logistics industry (freight brokers, carriers, 3PL)
+Mission: ${knowledgeBase.mission}
 
-### Why XAIVON Exists
-${knowledgeBase.whyXaivonExists}
+**Services & Starting Prices:**
+${knowledgeBase.services.map((s: { category: string; tiers: Array<{ name: string; price: string }> }) => `- ${s.category}: ${s.tiers[0].name} from ${s.tiers[0].price}`).join('\n')}
 
-### Mission
-${knowledgeBase.mission}
+**Industries:** ${knowledgeBase.industries.slice(0, 6).join(', ')}
+**Contact:** ${knowledgeBase.company.email} | ${knowledgeBase.company.calendly}
 
-### Vision
-${knowledgeBase.vision}
+**Key Facts:**
+- What is ${knowledgeBase.company.name}? ${knowledgeBase.faq[0]?.answer || 'An AI Infrastructure Company.'}
+- Who founded it? ${knowledgeBase.company.founder}, ${knowledgeBase.company.founderTitle}
 
-### Services & Pricing
-${knowledgeBase.services.map((s: { category: string; description: string; tiers: Array<{ name: string; price: string; includes: string[] }> }) => `
-**${s.category}** — ${s.description}
-${s.tiers.map((t: { name: string; price: string; includes: string[] }) => `- **${t.name}**: ${t.price} — ${t.includes.join(', ')}`).join('\n')}`).join('\n')}
-
-### Industries Served
-${knowledgeBase.industries.join(', ')}
-
-### FAQ
-${knowledgeBase.faq.map((f: { question: string; answer: string }) => `Q: ${f.question}\nA: ${f.answer}`).join('\n\n')}
-
-### Implementation Process
-${knowledgeBase.implementationProcess.map((step: string, i: number) => `${i + 1}. ${step}`).join('\n')}
-
-### Competitive Advantages
-${knowledgeBase.competitiveAdvantages.map((a: string) => `- ${a}`).join('\n')}
-
-### Contact
-- Email: ${knowledgeBase.company.email}
-- Schedule a call: ${knowledgeBase.company.calendly}
-- Website: ${knowledgeBase.company.website}
+For detailed pricing tiers, full service specs, implementation details, and case studies — rely on the RETRIEVED KNOWLEDGE BASE CONTEXT injected below when available.
 
 ## HUMAN-LIKE INTELLIGENCE
 You read between the lines. Even if a message has typos, abbreviations, broken grammar, or mixed languages — understand the intent and respond to what they MEANT, not what they literally typed.
@@ -243,7 +222,7 @@ This is a conversation, not a transaction. Maintain thread:
 // Structured modularly so a formal Token Budget Manager can be plugged in later.
 function prepareConversationContext<T>(messages: T[]): T[] {
   // Step 1: Temporary protection - Keep only the recent conversation
-  const MAX_HISTORY = 10;
+  const MAX_HISTORY = 6; // Reduced from 10 to keep total tokens under Groq TPM limits
   if (messages.length > MAX_HISTORY) {
     return messages.slice(-MAX_HISTORY);
   }

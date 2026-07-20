@@ -84,8 +84,20 @@ export class WebSpeechProvider implements VoiceProvider {
         if (!transcript) continue;
 
         if (event.results[i].isFinal) {
-          // Append discrete final words (Desktop) or cumulative sentence (Android)
-          finalText = finalText ? finalText + ' ' + transcript : transcript;
+          if (finalText) {
+            const lf = finalText.toLowerCase().trim();
+            const ln = transcript.toLowerCase().trim();
+            if (ln.startsWith(lf)) {
+              // Android cumulative final: new result replaces/extends old — use the longer one
+              finalText = transcript;
+            } else if (!lf.endsWith(ln)) {
+              // Desktop discrete final: append only if not already trailing
+              finalText = finalText + ' ' + transcript;
+            }
+            // If lf already ends with ln → pure duplicate, skip
+          } else {
+            finalText = transcript;
+          }
         } else {
           // Always overwrite — only the latest interim hypothesis matters
           interimText = transcript;

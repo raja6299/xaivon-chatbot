@@ -57,7 +57,7 @@ export const chatRequestSchema = z.object({
       content: z.union([
         z.string().max(10000),
         z.array(z.any()).max(20)
-      ]).optional(),
+      ]).optional().nullable(), // nullable: AI SDK sends content:null for tool-only messages
       parts: z.array(z.any()).max(20).optional(),
       id: z.string().optional(),
     }).passthrough()
