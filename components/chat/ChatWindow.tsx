@@ -78,6 +78,36 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
     transport: new DefaultChatTransport({ 
       api: '/api/chat',
       headers: sessionId ? { 'x-session-id': sessionId } : undefined,
+      fetch: async (url, options) => {
+        if (options?.body) {
+          try {
+            const parsed = JSON.parse(options.body as string);
+            if (parsed.messages && Array.isArray(parsed.messages)) {
+              const MAX_WINDOW = 30;
+              const msgs = parsed.messages;
+              if (msgs.length > MAX_WINDOW) {
+                let startIndex = msgs.length - MAX_WINDOW;
+                // Ensure we don't sever a tool call chain. Backtrack to a clean user or simple assistant message.
+                while (startIndex > 0) {
+                  const msg = msgs[startIndex];
+                  const hasToolCalls = msg.toolInvocations && msg.toolInvocations.length > 0;
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const hasToolParts = msg.parts && msg.parts.some((p: any) => p.type === 'tool-invocation' || p.type === 'tool-call');
+                  if (msg.role === 'user' || (msg.role === 'assistant' && !hasToolCalls && !hasToolParts)) {
+                    break;
+                  }
+                  startIndex--;
+                }
+                parsed.messages = msgs.slice(startIndex);
+                options.body = JSON.stringify(parsed);
+              }
+            }
+          } catch (e) {
+            console.error("Payload intercept failed", e);
+          }
+        }
+        return fetch(url, options);
+      }
     }),
   });
   

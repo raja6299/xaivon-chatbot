@@ -1,5 +1,5 @@
 import { groq } from '@ai-sdk/groq';
-import { streamText, convertToModelMessages, jsonSchema } from 'ai';
+import { streamText, convertToModelMessages, jsonSchema, safeValidateUIMessages, pruneMessages } from 'ai';
 import { checkRateLimit, sanitizeInput, chatRequestSchema, logAnalytics, logSecurity } from '@/lib/security';
 import { RAGManager } from '@/lib/rag/RAGManager';
 import { integrations } from '@/lib/integrations/manager';
@@ -35,16 +35,7 @@ Contact: raja@xaivon.com | calendly.com/xaivon
 - If user is frustrated → acknowledge first, then help.
 - Trust through specificity not enthusiasm. Consult first, sell second.`;
 
-// Helper to manage context window and prevent token overflow
-// Structured modularly so a formal Token Budget Manager can be plugged in later.
-function prepareConversationContext<T>(messages: T[]): T[] {
-  // Step 1: Temporary protection - Keep only the recent conversation
-  const MAX_HISTORY = 6; // Reduced from 10 to keep total tokens under Groq TPM limits
-  if (messages.length > MAX_HISTORY) {
-    return messages.slice(-MAX_HISTORY);
-  }
-  return messages;
-}
+// Deprecated prepareConversationContext removed since it was unused.
 
 export async function POST(req: Request) {
   const requestId = `XAIVON-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
@@ -102,13 +93,22 @@ export async function POST(req: Request) {
         let firstMsgParts = 'N/A';
         let firstMsgContent = 'N/A';
         
+        const getMsgText = (m: Record<string, unknown> | null) => {
+          if (m && typeof m.content === 'string') return m.content;
+          if (m && Array.isArray(m.parts)) {
+            return m.parts.filter((p: unknown) => typeof p === 'object' && p !== null && (p as Record<string, unknown>).type === 'text').map((p: unknown) => (p as Record<string, unknown>).text).join('');
+          }
+          return '';
+        };
+
         if (body && Array.isArray(body.messages) && body.messages.length > 0) {
           const firstMsg = body.messages[0];
           if (firstMsg && typeof firstMsg === 'object') {
             firstMsgRole = firstMsg.role || 'undefined';
             firstMsgKeys = Object.keys(firstMsg).join(', ');
             firstMsgParts = firstMsg.parts ? JSON.stringify(firstMsg.parts) : 'undefined';
-            firstMsgContent = firstMsg.content ? (typeof firstMsg.content === 'string' ? firstMsg.content.substring(0, 100) : 'non-string') : 'undefined';
+            const txt = getMsgText(firstMsg);
+            firstMsgContent = txt ? txt.substring(0, 100) : 'undefined';
           }
         }
         
@@ -135,22 +135,30 @@ export async function POST(req: Request) {
       );
     }
 
-    const { messages, sessionId: bodySessionId } = validationResult.data;
+    const { messages: rawMessages, sessionId: bodySessionId } = validationResult.data;
+    const uiMessagesValidation = await safeValidateUIMessages({ messages: rawMessages });
+    
+    if (!uiMessagesValidation.success) {
+      logSecurity('UIMessagesValidationError', { ip, error: uiMessagesValidation.error });
+      return new Response(
+        JSON.stringify({ error: 'Invalid message structure' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const messages = uiMessagesValidation.data;
     const sessionId = req.headers.get('x-session-id') || bodySessionId;
 
     // Sanitize message content to prevent prompt injection and XSS
     const sanitizedMessages = messages.map(m => {
-      let sanitized = m;
-      if (typeof m === 'object' && m !== null) {
-        sanitized = { ...m };
-        if (typeof m.content === 'string') {
-          sanitized.content = sanitizeInput(m.content);
-        }
-        
-        // Polyfill `.parts` if missing for convertToModelMessages compatibility
-        if (!sanitized.parts && typeof sanitized.content === 'string') {
-          sanitized.parts = [{ type: 'text', text: sanitized.content }];
-        }
+      const sanitized = { ...m };
+      if (sanitized.parts && Array.isArray(sanitized.parts)) {
+        sanitized.parts = sanitized.parts.map(part => {
+          if (part.type === 'text' && typeof part.text === 'string') {
+            return { ...part, text: sanitizeInput(part.text) };
+          }
+          return part;
+        });
       }
       return sanitized;
     });
@@ -172,22 +180,32 @@ export async function POST(req: Request) {
     // 5. RAG Retrieval
     const lastUserMessage = sanitizedMessages.filter(m => m.role === 'user').pop();
     let ragContext = '';
+    
+    const getMsgText = (m: Record<string, unknown> | null) => {
+      if (m && typeof m.content === 'string') return m.content;
+      if (m && Array.isArray(m.parts)) {
+        return m.parts.filter((p: unknown) => typeof p === 'object' && p !== null && (p as Record<string, unknown>).type === 'text').map((p: unknown) => (p as Record<string, unknown>).text).join('');
+      }
+      return '';
+    };
+    
+    const lastUserText = lastUserMessage ? getMsgText(lastUserMessage) : '';
 
     // Skip RAG for simple greetings and short social messages — they don't need KB context
     // This significantly reduces latency for the first message in a conversation
     const isSimpleGreeting = (() => {
-      if (!lastUserMessage || typeof lastUserMessage.content !== 'string') return false;
-      const msg = lastUserMessage.content.toLowerCase().trim();
+      if (!lastUserText) return false;
+      const msg = lastUserText.toLowerCase().trim();
       if (msg.length > 60) return false;
       const greetingPatterns = /^(hi|hello|hey|hye|helo|hii|hiii|namaste|namaskar|good morning|good evening|good afternoon|good night|sup|yo|howdy|kaise ho|kaisa hai|kya haal hai|kya chal raha|theek ho|thik ho|how are you|how r u|what'?s up|wassup|hola|salut|ciao|salam|thank you|thanks|thx|ok|okay|k|bye|goodbye|see you|take care|acha|accha|acha theek hai|ok thanks|ok thank you|shukriya|dhanyawad)[\s!?.]*$/.test(msg);
       return greetingPatterns;
     })();
 
-    if (lastUserMessage && typeof lastUserMessage.content === 'string' && !isSimpleGreeting) {
+    if (lastUserText && !isSimpleGreeting) {
       try {
         const ragManager = RAGManager.getInstance();
         await ragManager.initializeWithDefaults();
-        const results = await ragManager.retrieveContext(lastUserMessage.content, 4, 0.1);
+        const results = await ragManager.retrieveContext(lastUserText, 4, 0.1);
         
         if (results.length > 0) {
           ragContext = `\n\n## RETRIEVED KNOWLEDGE BASE CONTEXT (RAG)\nThe following context was retrieved from the Enterprise Knowledge Base. Use it to answer the user's latest query accurately. Prioritize this information over general knowledge.\n`;
@@ -203,7 +221,11 @@ export async function POST(req: Request) {
     const finalSystemPrompt = SYSTEM_PROMPT + ragContext;
 
     // 6. Modular Context Management (Prevent Token Overflow)
-    const contextSafeMessages = prepareConversationContext(sanitizedMessages);
+    const modelMessages = await convertToModelMessages(sanitizedMessages as import('ai').UIMessage[]);
+    const contextSafeMessages = pruneMessages({
+      messages: modelMessages,
+      toolCalls: [{ type: 'before-last-message' }]
+    });
 
     // Save User message to Supabase
     if (sessionId && process.env.SUPABASE_SERVICE_ROLE_KEY && lastUserMessage) {
@@ -217,7 +239,7 @@ export async function POST(req: Request) {
         await supabaseAdmin.from('messages').insert({
           session_id: sessionId,
           role: 'user',
-          content: lastUserMessage.content,
+          content: lastUserText,
         });
       } catch (err) {
         console.error('Failed to persist user message:', err);
@@ -229,7 +251,7 @@ export async function POST(req: Request) {
     const response = await streamText({
       model: groq(modelId),
       system: finalSystemPrompt,
-      messages: await convertToModelMessages(contextSafeMessages as import('ai').UIMessage[]),
+      messages: contextSafeMessages,
       temperature: 0.7,
       tools: {
         sendSlackNotification: {
