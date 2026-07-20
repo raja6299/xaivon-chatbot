@@ -51,17 +51,7 @@ export function sanitizeInput(input: string): string {
 // ZOD SCHEMAS
 // ==========================================
 export const chatRequestSchema = z.object({
-  messages: z.array(
-    z.object({
-      role: z.enum(['user', 'assistant', 'system', 'data', 'tool', 'function']),
-      content: z.union([
-        z.string().max(10000),
-        z.array(z.any()).max(20)
-      ]).optional().nullable(), // nullable: AI SDK sends content:null for tool-only messages
-      parts: z.array(z.any()).max(20).optional(),
-      id: z.string().optional(),
-    }).passthrough()
-  ).max(100),
+  messages: z.array(z.any()).max(50),
   sessionId: z.string().optional(),
 });
 
