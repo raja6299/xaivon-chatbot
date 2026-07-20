@@ -5,7 +5,7 @@ export class HubSpotProvider implements IntegrationProvider {
   name = 'HubSpot CRM';
   type = 'api_key' as const;
 
-  async execute(payload: Record<string, unknown>): Promise<IntegrationResult> {
+  async execute(_payload: Record<string, unknown>): Promise<IntegrationResult> {
     // Mocking HubSpot API for this phase. 
     // In production, this uses the official @hubspot/api-client or fetch
     

@@ -1,6 +1,5 @@
 import { groq } from '@ai-sdk/groq';
 import { streamText, convertToModelMessages, jsonSchema } from 'ai';
-import { knowledgeBase } from '@/lib/knowledge-base';
 import { checkRateLimit, sanitizeInput, chatRequestSchema, logAnalytics, logSecurity } from '@/lib/security';
 import { RAGManager } from '@/lib/rag/RAGManager';
 import { integrations } from '@/lib/integrations/manager';
