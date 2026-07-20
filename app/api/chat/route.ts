@@ -4,6 +4,14 @@ import { checkRateLimit, sanitizeInput, chatRequestSchema, logAnalytics, logSecu
 import { RAGManager } from '@/lib/rag/RAGManager';
 import { integrations } from '@/lib/integrations/manager';
 
+const getMsgText = (m: Record<string, unknown> | null) => {
+  if (m && typeof m.content === 'string') return m.content;
+  if (m && Array.isArray(m.parts)) {
+    return m.parts.filter((p: unknown) => typeof p === 'object' && p !== null && (p as Record<string, unknown>).type === 'text').map((p: unknown) => (p as Record<string, unknown>).text).join('');
+  }
+  return '';
+};
+
 const SYSTEM_PROMPT = `You are XAIVON's AI Solutions Consultant — a senior advisor on the XAIVON website. Help visitors understand AI automation and determine if XAIVON fits their needs.
 
 ## CRITICAL: COMPANY IDENTITY
@@ -90,16 +98,10 @@ export async function POST(req: Request) {
         
         let firstMsgRole = 'N/A';
         let firstMsgKeys = 'N/A';
+
+
         let firstMsgParts = 'N/A';
         let firstMsgContent = 'N/A';
-        
-        const getMsgText = (m: Record<string, unknown> | null) => {
-          if (m && typeof m.content === 'string') return m.content;
-          if (m && Array.isArray(m.parts)) {
-            return m.parts.filter((p: unknown) => typeof p === 'object' && p !== null && (p as Record<string, unknown>).type === 'text').map((p: unknown) => (p as Record<string, unknown>).text).join('');
-          }
-          return '';
-        };
 
         if (body && Array.isArray(body.messages) && body.messages.length > 0) {
           const firstMsg = body.messages[0];
@@ -181,15 +183,7 @@ export async function POST(req: Request) {
     const lastUserMessage = sanitizedMessages.filter(m => m.role === 'user').pop();
     let ragContext = '';
     
-    const getMsgText = (m: Record<string, unknown> | null) => {
-      if (m && typeof m.content === 'string') return m.content;
-      if (m && Array.isArray(m.parts)) {
-        return m.parts.filter((p: unknown) => typeof p === 'object' && p !== null && (p as Record<string, unknown>).type === 'text').map((p: unknown) => (p as Record<string, unknown>).text).join('');
-      }
-      return '';
-    };
-    
-    const lastUserText = lastUserMessage ? getMsgText(lastUserMessage) : '';
+    const lastUserText = lastUserMessage ? getMsgText(lastUserMessage as Record<string, unknown>) : '';
 
     // Skip RAG for simple greetings and short social messages — they don't need KB context
     // This significantly reduces latency for the first message in a conversation

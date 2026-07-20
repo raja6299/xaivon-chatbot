@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { after } from 'next/server';
+import { CHAT_HISTORY_HARD_LIMIT } from '@/lib/config/chat';
 
 // ==========================================
 // RATE LIMITING (Sliding Window)
@@ -51,7 +52,7 @@ export function sanitizeInput(input: string): string {
 // ZOD SCHEMAS
 // ==========================================
 export const chatRequestSchema = z.object({
-  messages: z.array(z.any()).max(40),
+  messages: z.array(z.any()).max(CHAT_HISTORY_HARD_LIMIT),
   sessionId: z.string().optional(),
 });
 

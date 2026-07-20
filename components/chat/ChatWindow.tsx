@@ -13,6 +13,7 @@ import { useVoice } from '../../hooks/useVoice';
 import { useFiles } from '../../hooks/useFiles';
 import { useTranslation } from '../../lib/i18n';
 import { Language } from '../../lib/i18n/types';
+import { CHAT_HISTORY_WINDOW } from '@/lib/config/chat';
 
 function getMessageText(message: UIMessage): string {
   return message.parts
@@ -83,7 +84,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
           try {
             const parsed = JSON.parse(options.body as string);
             if (parsed.messages && Array.isArray(parsed.messages)) {
-              const MAX_WINDOW = 30;
+              const MAX_WINDOW = CHAT_HISTORY_WINDOW;
               const msgs = parsed.messages;
               if (msgs.length > MAX_WINDOW) {
                 let startIndex = msgs.length - MAX_WINDOW;
