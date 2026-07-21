@@ -65,7 +65,7 @@ export function ChatWidget() {
             : { opacity: 0, scale: 0.92, y: 16 }
         }
         transition={{ type: 'spring', damping: 30, stiffness: 260 }}
-        className={`absolute bottom-[72px] right-0 w-[420px] max-w-[calc(100vw-32px)] h-[min(600px,calc(100vh-120px))] rounded-2xl shadow-[0_12px_40px_-12px_rgba(0,0,0,0.5)] border border-violet-500/20 overflow-hidden ${
+        className={`absolute bottom-[72px] right-0 w-[420px] max-w-[calc(100vw-32px)] chat-widget-viewport rounded-2xl shadow-[0_12px_40px_-12px_rgba(0,0,0,0.5)] border border-violet-500/20 overflow-hidden ${
           !isOpen ? 'pointer-events-none' : ''
         }`}
         style={{ transformOrigin: 'bottom right' }}

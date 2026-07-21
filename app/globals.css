@@ -244,3 +244,14 @@ body {
   background: rgba(10, 14, 26, 0.85);
   backdrop-filter: blur(8px);
 }
+
+/* ─── Chat Widget Viewport Fix ─── */
+.chat-widget-viewport {
+  height: min(600px, calc(100vh - 120px));
+}
+
+@supports (height: 100dvh) {
+  .chat-widget-viewport {
+    height: min(600px, calc(100dvh - 120px - env(safe-area-inset-bottom, 0px)));
+  }
+}
