@@ -1,5 +1,3 @@
-import { ChatWidget } from "@/components/chat/ChatWidget";
-
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#0B0F19] text-[#F9FAFB] flex flex-col items-center justify-center p-8 relative overflow-hidden">
@@ -19,9 +17,7 @@ export default function Home() {
           Your intelligent architect assistant is ready. Click the chat bubble in the bottom right to get started.
         </p>
       </div>
-      
-      {/* Render the chat widget */}
-      <ChatWidget />
     </main>
   );
 }
+

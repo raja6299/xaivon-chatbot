@@ -1,10 +1,15 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ChatWindow } from './ChatWindow';
 
+/** Routes where the chat widget should not appear */
+const HIDDEN_ROUTES = ['/login', '/admin'];
+
 export function ChatWidget() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const widgetRef = useRef<HTMLDivElement>(null);
   const [hasMounted, setHasMounted] = useState(false);
@@ -39,6 +44,12 @@ export function ChatWidget() {
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen]);
 
+  // Hide on excluded routes
+  const isHidden = HIDDEN_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+  if (isHidden) return null;
+
   return (
     <div ref={widgetRef} className="fixed bottom-5 right-5 z-50">
       {/*
@@ -53,8 +64,8 @@ export function ChatWidget() {
             ? { opacity: 1, scale: 1, y: 0 }
             : { opacity: 0, scale: 0.92, y: 16 }
         }
-        transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-        className={`absolute bottom-[72px] right-0 w-[380px] max-w-[calc(100vw-40px)] h-[min(580px,calc(100vh-120px))] rounded-2xl shadow-2xl shadow-black/40 border border-violet-500/15 overflow-hidden ${
+        transition={{ type: 'spring', damping: 30, stiffness: 260 }}
+        className={`absolute bottom-[72px] right-0 w-[420px] max-w-[calc(100vw-32px)] h-[min(600px,calc(100vh-120px))] rounded-2xl shadow-[0_12px_40px_-12px_rgba(0,0,0,0.5)] border border-violet-500/20 overflow-hidden ${
           !isOpen ? 'pointer-events-none' : ''
         }`}
         style={{ transformOrigin: 'bottom right' }}
@@ -104,3 +115,4 @@ export function ChatWidget() {
     </div>
   );
 }
+
