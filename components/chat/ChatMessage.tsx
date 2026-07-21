@@ -133,10 +133,10 @@ export const ChatMessage = memo(function ChatMessage({ role, content, isStreamin
       )}
 
       <div
-        className={`max-w-[80%] ${
+        className={`max-w-[85%] ${
           isUser
-            ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-2xl rounded-br-sm shadow-lg shadow-violet-500/10 px-3.5 py-2.5 text-[0.8125rem] leading-relaxed'
-            : 'bg-[#151d35] text-slate-100 border border-violet-500/8 rounded-2xl rounded-tl-sm px-3.5 py-2.5'
+            ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-2xl rounded-br-sm shadow-lg shadow-violet-500/10 px-4 py-3 text-[0.8125rem] leading-relaxed'
+            : 'bg-[#151d35] text-slate-100 border border-violet-500/8 rounded-2xl rounded-tl-sm px-4 py-3'
         }`}
       >
         {isUser ? (

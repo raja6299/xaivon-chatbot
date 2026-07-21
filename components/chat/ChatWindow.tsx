@@ -25,10 +25,10 @@ function getMessageText(message: UIMessage): string {
 const LEAD_TRIGGER = '[TRIGGER_LEAD_FORM]';
 
 const QUICK_SUGGESTIONS = [
-  { icon: '📋', text: 'What services does XAIVON offer?' },
-  { icon: '💰', text: 'How much does AI automation cost?' },
-  { icon: '🚀', text: 'How can AI help my logistics business?' },
-  { icon: '🤖', text: 'What is QuoteFlow AI?' },
+  { icon: '🤖', text: 'Build an AI chatbot' },
+  { icon: '🚀', text: 'Automate my logistics business' },
+  { icon: '💰', text: 'AI pricing' },
+  { icon: '📅', text: 'Book a consultation' },
 ];
 
 function getContextualSuggestions(messages: UIMessage[]): { icon: string; text: string }[] {
@@ -581,7 +581,7 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
         )}
 
         {/* Typing Indicator */}
-        {status === 'submitted' && (
+        {(status === 'submitted' || (status === 'streaming' && messages[messages.length - 1]?.role === 'assistant' && getMessageText(messages[messages.length - 1]).length === 0)) && (
           <div className="flex items-start gap-2.5 animate-fade-in-up">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5">X</div>
             <div className="flex gap-1 items-center px-4 py-3 bg-[#151d35] border border-violet-500/8 rounded-2xl rounded-tl-sm">
