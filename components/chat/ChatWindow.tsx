@@ -229,11 +229,27 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
     initializeSession();
   }, [setMessages]);
 
-  // Save chat history on change
+  // Save chat history on change (Debounced to prevent main thread blocking during stream)
   useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem('xaivon_chat_messages', JSON.stringify(messages));
-    }
+    if (messages.length === 0) return;
+    
+    const timeoutId = setTimeout(() => {
+      const writeToStorage = () => {
+        try {
+          localStorage.setItem('xaivon_chat_messages', JSON.stringify(messages));
+        } catch (e) {
+          console.error("Failed to save chat history", e);
+        }
+      };
+
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        window.requestIdleCallback(writeToStorage, { timeout: 2000 });
+      } else {
+        writeToStorage();
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
   }, [messages]);
 
   // Lead form trigger detection
