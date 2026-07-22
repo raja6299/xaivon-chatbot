@@ -51,7 +51,8 @@ export async function POST(req: Request) {
   try {
     // 1. Rate Limiting (Sliding Window: 10 requests per minute per IP)
     const forwarded = req.headers.get('x-forwarded-for');
-    const ip = forwarded?.split(',')[0]?.trim() || 'unknown';
+    const sessionIdHeader = req.headers.get('x-session-id');
+    const ip = forwarded?.split(',')[0]?.trim() || sessionIdHeader || 'unknown';
     const rateLimit = checkRateLimit(`chat_${ip}`, 10, 60_000);
     
     if (!rateLimit.success) {
