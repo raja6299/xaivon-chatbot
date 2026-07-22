@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { TranslationProvider } from "@/lib/i18n/TranslationProvider";
 import { ChatWidget } from "@/components/chat/ChatWidget";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -59,7 +60,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <TranslationProvider>
           {children}
-          <ChatWidget />
+          <ErrorBoundary>
+            <ChatWidget />
+          </ErrorBoundary>
         </TranslationProvider>
       </body>
     </html>
