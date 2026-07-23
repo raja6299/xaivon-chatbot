@@ -2,7 +2,6 @@ import type { NextConfig } from "next";
 
 const securityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
-  { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=()" },
@@ -17,7 +16,9 @@ const securityHeaders = [
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.groq.com",
       "media-src 'self' blob:",
       "worker-src 'self' blob:",
-      "frame-ancestors 'self'",
+      process.env.NODE_ENV === "production" 
+        ? "frame-ancestors 'self' https://xaivon.com https://xaivon-website.vercel.app" 
+        : "frame-ancestors 'self' http://localhost:5173 http://localhost:3000",
     ].join("; "),
   },
 ];

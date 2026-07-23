@@ -1,12 +1,15 @@
 import { MetadataRoute } from "next";
+import { getSiteUrl } from "@/lib/config";
 
 export default function robots(): MetadataRoute.Robots {
+  const siteUrl = getSiteUrl();
+
   return {
     rules: {
       userAgent: "*",
       allow: "/",
       disallow: ["/admin/", "/api/"],
     },
-    sitemap: "https://xaivon-chatbot.vercel.app/sitemap.xml",
+    sitemap: `${siteUrl}/sitemap.xml`,
   };
 }

@@ -4,6 +4,7 @@ import "./globals.css";
 import { TranslationProvider } from "@/lib/i18n/TranslationProvider";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { getSiteUrl } from "@/lib/config";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,29 +16,36 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "XAIVON | AI Solutions Consultant",
-  description:
-    "XAIVON is an enterprise AI solutions platform offering automation, intelligent workflows, and AI-powered consulting for logistics and hospitality businesses.",
-  keywords: ["AI automation", "enterprise AI", "AI chatbot", "business automation", "XAIVON"],
-  authors: [{ name: "XAIVON" }],
-  robots: { index: true, follow: true },
-  openGraph: {
+export function generateMetadata(): Metadata {
+  const siteUrl = getSiteUrl();
+
+  return {
+    metadataBase: new URL(siteUrl),
     title: "XAIVON | AI Solutions Consultant",
     description:
-      "Enterprise AI automation and intelligent workflow solutions. Talk to our AI consultant and discover what's possible.",
-    url: "https://xaivon-chatbot.vercel.app",
-    siteName: "XAIVON",
-    locale: "en_US",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "XAIVON | AI Solutions Consultant",
-    description: "Enterprise AI automation and intelligent workflow solutions.",
-  },
-
-};
+      "XAIVON is an enterprise AI solutions platform offering automation, intelligent workflows, and AI-powered consulting for logistics and hospitality businesses.",
+    keywords: ["AI automation", "enterprise AI", "AI chatbot", "business automation", "XAIVON"],
+    authors: [{ name: "XAIVON" }],
+    robots: { index: true, follow: true },
+    alternates: {
+      canonical: siteUrl,
+    },
+    openGraph: {
+      title: "XAIVON | AI Solutions Consultant",
+      description:
+        "Enterprise AI automation and intelligent workflow solutions. Talk to our AI consultant and discover what's possible.",
+      url: siteUrl,
+      siteName: "XAIVON",
+      locale: "en_US",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "XAIVON | AI Solutions Consultant",
+      description: "Enterprise AI automation and intelligent workflow solutions.",
+    },
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",

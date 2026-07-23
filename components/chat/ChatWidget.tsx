@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { ChatWindow } from './ChatWindow';
 
 /** Routes where the chat widget should not appear */
-const HIDDEN_ROUTES = ['/login', '/admin'];
+const HIDDEN_ROUTES = ['/login', '/admin', '/embed'];
 
 export function ChatWidget() {
   const pathname = usePathname();
