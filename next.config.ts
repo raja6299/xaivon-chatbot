@@ -17,7 +17,7 @@ const securityHeaders = [
       "media-src 'self' blob:",
       "worker-src 'self' blob:",
       process.env.NODE_ENV === "production" 
-        ? "frame-ancestors 'self' https://xaivon.com https://xaivon-website.vercel.app" 
+        ? "frame-ancestors 'self' https://xaivon.com https://www.xaivon.com" 
         : "frame-ancestors 'self' http://localhost:5173 http://localhost:3000",
     ].join("; "),
   },
