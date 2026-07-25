@@ -60,11 +60,32 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const siteUrl = getSiteUrl();
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "XAIVON",
+    "url": siteUrl,
+    "logo": `${siteUrl}/logo.png`,
+    "description": "Enterprise AI automation and intelligent workflow solutions for logistics and hospitality businesses.",
+    "email": "raja@xaivon.com",
+    "sameAs": [
+      "https://www.linkedin.com/in/raja-xaivon"
+    ]
+  };
+
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         <TranslationProvider>
           {children}
