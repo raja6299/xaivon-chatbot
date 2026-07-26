@@ -1,20 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { TranslationProvider } from "@/lib/i18n/TranslationProvider";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getSiteUrl } from "@/lib/config";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export function generateMetadata(): Metadata {
   const siteUrl = getSiteUrl();
@@ -78,7 +67,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`h-full antialiased`}
     >
       <head>
         <script
