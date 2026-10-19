@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Play, Pause, Square, X, Volume2 } from 'lucide-react';
 import { getVoiceManager } from '../../lib/voice/VoiceManager';
+import { XaivonLogo } from '../brand/XaivonLogo';
 
 export interface ChatMessageProps {
   role: 'user' | 'assistant';
@@ -12,11 +13,16 @@ export interface ChatMessageProps {
   isStreaming?: boolean;
 }
 
-const MessageVoiceControl = memo(function MessageVoiceControl({ content, isStreaming }: { content: string, isStreaming: boolean }) {
+const MessageVoiceControl = memo(function MessageVoiceControl({
+  content,
+  isStreaming,
+}: {
+  content: string;
+  isStreaming: boolean;
+}) {
   const [playState, setPlayState] = useState<'idle' | 'playing' | 'paused'>('idle');
   const unsubRef = useRef<(() => void) | null>(null);
 
-  // Cleanup subscription on unmount
   useEffect(() => {
     return () => {
       if (unsubRef.current) {
@@ -28,9 +34,8 @@ const MessageVoiceControl = memo(function MessageVoiceControl({ content, isStrea
 
   const handleListen = useCallback(() => {
     const manager = getVoiceManager();
-    manager.interruptOutput(); // Stop any ongoing speech
+    manager.interruptOutput();
 
-    // Subscribe to state ONLY while this message is speaking
     if (unsubRef.current) unsubRef.current();
     unsubRef.current = manager.subscribeToState((s) => {
       if (s === 'idle' || s === 'error' || s === 'completed') {
@@ -72,43 +77,42 @@ const MessageVoiceControl = memo(function MessageVoiceControl({ content, isStrea
   if (isStreaming) return null;
 
   return (
-    <div className="mt-3 flex items-center gap-1.5 border-t border-violet-500/10 pt-2">
+    <div className="mt-2.5 flex items-center gap-1.5 border-t border-[var(--border-glass)] pt-2">
       {playState === 'idle' ? (
-        <button 
+        <button
           onClick={handleListen}
-          className="flex items-center gap-1.5 text-[10px] font-medium text-violet-300 hover:text-white bg-violet-500/10 hover:bg-violet-500/20 px-2.5 py-1.5 rounded-lg transition-colors duration-200"
-          aria-label="Listen to AI response"
+          className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--copper-light)] hover:text-white bg-[var(--copper-glow)] hover:bg-[var(--copper-primary)] px-2.5 py-1.5 rounded-lg transition-colors duration-200"
+          aria-label="Listen to response"
         >
           <Volume2 className="w-3.5 h-3.5" />
           Listen
         </button>
       ) : (
-        <div className="flex items-center gap-1.5 bg-violet-500/10 px-2 py-1 rounded-lg border border-violet-500/20 animate-fade-in-up">
+        <div className="flex items-center gap-1.5 bg-[var(--bg-surface)] px-2 py-1 rounded-lg border border-[var(--border-subtle)] animate-fade-in-up">
           <button
             onClick={handlePauseResume}
-            className="flex items-center gap-1 text-[10px] font-medium text-violet-300 hover:text-white hover:bg-violet-500/20 px-2 py-1.5 rounded-md transition-colors"
-            aria-label={playState === 'paused' ? "Resume AI voice" : "Pause AI voice"}
+            className="flex items-center gap-1 text-[11px] font-medium text-[var(--copper-light)] hover:text-white px-2 py-1 rounded transition-colors"
+            aria-label={playState === 'paused' ? 'Resume voice' : 'Pause voice'}
           >
             {playState === 'paused' ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
             {playState === 'paused' ? 'Resume' : 'Pause'}
           </button>
-          <div className="w-px h-3 bg-violet-500/20 mx-0.5"></div>
+          <div className="w-px h-3 bg-[var(--border-glass)] mx-0.5"></div>
           <button
             onClick={handleClose}
-            className="flex items-center gap-1 text-[10px] font-medium text-red-300 hover:text-red-200 hover:bg-red-500/20 px-2 py-1.5 rounded-md transition-colors"
-            aria-label="Stop AI voice"
+            className="flex items-center gap-1 text-[11px] font-medium text-red-400 hover:text-red-300 px-2 py-1 rounded transition-colors"
+            aria-label="Stop speech"
           >
             <Square className="w-3.5 h-3.5" />
             Stop
           </button>
-          <div className="w-px h-3 bg-violet-500/20 mx-0.5"></div>
+          <div className="w-px h-3 bg-[var(--border-glass)] mx-0.5"></div>
           <button
             onClick={handleClose}
-            className="flex items-center gap-1 text-[10px] font-medium text-slate-400 hover:text-white hover:bg-white/10 px-2 py-1.5 rounded-md transition-colors"
+            className="flex items-center gap-1 text-[11px] font-medium text-[var(--text-muted)] hover:text-white px-1.5 py-1 rounded transition-colors"
             aria-label="Close voice controls"
           >
             <X className="w-3.5 h-3.5" />
-            Close
           </button>
         </div>
       )}
@@ -116,7 +120,11 @@ const MessageVoiceControl = memo(function MessageVoiceControl({ content, isStrea
   );
 });
 
-export const ChatMessage = memo(function ChatMessage({ role, content, isStreaming = false }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({
+  role,
+  content,
+  isStreaming = false,
+}: ChatMessageProps) {
   const isUser = role === 'user';
 
   if (!content) return null;
@@ -125,18 +133,21 @@ export const ChatMessage = memo(function ChatMessage({ role, content, isStreamin
     <div
       className={`flex ${isUser ? 'justify-end' : 'justify-start'} items-start gap-2.5 animate-fade-in-up`}
     >
-      {/* Bot avatar */}
+      {/* Bot badge */}
       {!isUser && (
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5 shadow-md shadow-violet-500/15" aria-hidden="true">
-          X
+        <div
+          className="w-7 h-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center p-1 shrink-0 mt-0.5 shadow-sm"
+          aria-hidden="true"
+        >
+          <XaivonLogo className="w-full h-full" glow={false} />
         </div>
       )}
 
       <div
-        className={`max-w-[85%] ${
+        className={`max-w-[85%] rounded-2xl px-4 py-3 ${
           isUser
-            ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-2xl rounded-br-sm shadow-lg shadow-violet-500/10 px-4 py-3 text-[0.8125rem] leading-relaxed'
-            : 'bg-[#151d35] text-slate-100 border border-violet-500/8 rounded-2xl rounded-tl-sm px-4 py-3'
+            ? 'bg-[var(--bg-bubble-user)] text-[var(--text-user)] rounded-br-sm shadow-md text-[0.84rem] leading-relaxed'
+            : 'bg-[var(--bg-bubble-bot)] text-[var(--text-primary)] border border-[var(--border-glass)] rounded-tl-sm shadow-sm'
         }`}
       >
         {isUser ? (
@@ -149,13 +160,15 @@ export const ChatMessage = memo(function ChatMessage({ role, content, isStreamin
           </div>
         )}
 
-        {/* Voice Controls */}
         {!isUser && <MessageVoiceControl content={content} isStreaming={isStreaming} />}
       </div>
 
       {/* User avatar */}
       {isUser && (
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center text-slate-200 text-[9px] font-semibold shrink-0 mt-0.5 tracking-tight" aria-hidden="true">
+        <div
+          className="w-7 h-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-glass)] flex items-center justify-center text-[var(--text-secondary)] text-[10px] font-medium shrink-0 mt-0.5"
+          aria-hidden="true"
+        >
           You
         </div>
       )}

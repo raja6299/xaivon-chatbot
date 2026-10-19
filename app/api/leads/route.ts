@@ -3,10 +3,11 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 
 import { isValidPhoneNumber } from 'libphonenumber-js';
-import { checkRateLimit, sanitizeInput, leadRequestSchema, logAnalytics, logSecurity } from '@/lib/security';
+import { checkRateLimit, sanitizeInput, leadRequestSchema, logAnalytics, logSecurity, maskEmail, getTrustedClientIp } from '@/lib/security';
+import { verifySessionToken } from '@/lib/security/session';
 
 /**
- * Attempts to get a Supabase client. Returns null if env vars are missing/placeholder.
+ * Attempts to get a Supabase client. Returns null if env vars are missing or placeholder.
  */
 async function getSupabaseClientSafe() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -15,6 +16,7 @@ async function getSupabaseClientSafe() {
   if (
     !url ||
     !serviceRoleKey ||
+    url.includes('dummy') ||
     url.includes('your_supabase') ||
     serviceRoleKey.includes('your_supabase')
   ) {
@@ -31,16 +33,15 @@ async function getSupabaseClientSafe() {
 
 export async function POST(req: Request) {
   try {
-    // 1. Rate Limiting (Sliding Window: 5 requests per minute per IP)
-    const forwarded = req.headers.get('x-forwarded-for');
-    const ip = forwarded?.split(',')[0]?.trim() || 'unknown';
+    // 1. Rate Limiting (5 requests per minute per IP sliding window)
+    const ip = getTrustedClientIp(req);
 
     const rateLimit = checkRateLimit(`leads_${ip}`, 5, 60_000);
     if (!rateLimit.success) {
       logSecurity('RateLimitExceeded', { ip, endpoint: '/api/leads' });
       return NextResponse.json(
-        { error: 'Too many requests. Please try again in a minute.' },
-        { 
+        { error: 'Too many submissions. Please wait a minute before trying again.' },
+        {
           status: 429,
           headers: {
             'Retry-After': String(rateLimit.retryAfter || 60)
@@ -60,13 +61,16 @@ export async function POST(req: Request) {
 
     const validationResult = leadRequestSchema.safeParse(rawBody);
     if (!validationResult.success) {
-      logSecurity('ValidationError', { ip, errors: validationResult.error.format() });
-      return NextResponse.json({ error: 'Invalid request format or oversized payload' }, { status: 400 });
+      logSecurity('ValidationError', { ip });
+      return NextResponse.json(
+        { error: 'Please check your submission details and ensure all fields are valid.' },
+        { status: 400 }
+      );
     }
 
     const body = validationResult.data;
 
-    // 3. Honeypot check: if website field is filled, silently succeed
+    // 3. Honeypot check: if hidden website field is filled, silently return success
     if (body.website) {
       logSecurity('HoneypotTriggered', { ip, field: 'website' });
       return NextResponse.json({ success: true });
@@ -77,15 +81,22 @@ export async function POST(req: Request) {
     const email = sanitizeInput(body.email);
     const company = sanitizeInput(body.company);
     const phone = body.phone ? sanitizeInput(body.phone) : '';
-    const sessionId = body.sessionId ? sanitizeInput(body.sessionId) : '';
 
-    const cleanEmail = email.toLowerCase();
+    // Verify session token
+    const rawSessionToken = req.headers.get('x-session-token') || body.sessionToken || req.headers.get('x-session-id') || body.sessionId;
+    const sessionCheck = verifySessionToken(rawSessionToken);
+    const verifiedSessionId = sessionCheck.valid ? sessionCheck.sessionId : null;
+
+    const cleanEmail = email.toLowerCase().trim();
 
     // Phone: optional, strict international validation
     let cleanPhone: string | null = null;
     if (phone) {
       if (!isValidPhoneNumber(phone)) {
-        return NextResponse.json({ error: 'Please enter a valid international phone number.' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Please enter a valid phone number with country code (e.g., +91 or +1).' },
+          { status: 400 }
+        );
       }
       cleanPhone = phone.trim();
     }
@@ -94,88 +105,90 @@ export async function POST(req: Request) {
     const supabase = await getSupabaseClientSafe();
 
     if (!supabase) {
-      logSecurity('MissingSupabase', { endpoint: '/api/leads' });
-      return NextResponse.json({ error: 'Database connection not configured' }, { status: 500 });
+      logAnalytics('LeadCaptureServiceUnavailable', {
+        companyLength: company.length,
+        hasPhone: !!cleanPhone,
+        timestamp: new Date().toISOString()
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Lead registration service is currently offline or awaiting configuration. Please contact Raja Babu directly at raja@xaivon.com (+91-95211-90205) or book a discovery call at https://calendly.com/xaivon.',
+          fallbackMailto: `mailto:raja@xaivon.com?subject=${encodeURIComponent(`Consultation Inquiry from ${fullName} (${company})`)}&body=${encodeURIComponent(`Name: ${fullName}\nCompany: ${company}\nEmail: ${cleanEmail}\nPhone: ${cleanPhone || 'N/A'}\n`)}`
+        },
+        { status: 503 }
+      );
     }
 
-    // 5. Duplicate Lead Detection
-    let orQuery = `email.eq.${cleanEmail},company.eq.${company}`;
-    if (cleanPhone) {
-      orQuery += `,phone.eq.${cleanPhone}`;
-    }
-
+    // 5. Duplicate Lead Detection (Safe PostgREST query on clean email)
     try {
-      const { data: existingLead } = await supabase
+      const { data: existingLead, error: dupCheckErr } = await supabase
         .from('enterprise_leads')
         .select('id')
-        .or(orQuery)
+        .eq('email', cleanEmail)
         .limit(1);
 
-      if (existingLead && existingLead.length > 0) {
-        logAnalytics('DuplicateLeadPrevented', { email: cleanEmail, company });
-        return NextResponse.json({ success: true, note: 'You\'re already in touch with our team.' });
+      if (dupCheckErr) {
+        logSecurity('DuplicateCheckFailed', { code: dupCheckErr.code });
+      } else if (existingLead && existingLead.length > 0) {
+        logAnalytics('DuplicateLeadPrevented', { maskedEmail: maskEmail(cleanEmail) });
+        return NextResponse.json({
+          success: true,
+          status: 'already_registered',
+          note: "An inquiry for this contact is already recorded. Our team will contact you directly."
+        });
       }
-    } catch (dbError) {
-      logSecurity('SupabaseError', { action: 'DuplicateCheck', error: String(dbError) });
-      // Proceed gracefully even if duplicate check fails
+    } catch {
+      logSecurity('SupabaseError', { action: 'DuplicateCheck', code: 'EXCEPTION' });
     }
 
-    // Insert (matches exact live schema)
+    // 6. Insert Lead (Matches schema)
     const insertPayload = {
       full_name: fullName,
       email: cleanEmail,
       company: company,
       phone: cleanPhone,
-      session_id: sessionId || null,
+      session_id: verifiedSessionId || null,
       pipeline_stage: 'new',
     };
 
     const { data, error } = await supabase
       .from('enterprise_leads')
       .insert([insertPayload])
-      .select();
+      .select('id');
 
     if (error) {
-      // Handle unique constraint violations gracefully
       if (error.code === '23505') {
-        return NextResponse.json({ success: true, note: 'Lead already exists for this session' });
+        return NextResponse.json({
+          success: true,
+          status: 'already_registered',
+          note: 'An inquiry for this contact is already recorded.'
+        });
       }
 
+      logSecurity('LeadInsertError', { code: error.code });
       return NextResponse.json(
-        { error: `Database Error: ${error.message}` },
+        { error: 'Unable to save your details right now. Please email raja@xaivon.com directly.' },
         { status: 500 }
       );
     }
 
-    // Process Enterprise CRM Payload (Phase 5)
-    // Run securely on the server. If it fails, do not block lead submission.
-    if (body.messages && Array.isArray(body.messages) && body.messages.length > 0) {
-      setImmediate(async () => {
-        try {
-          const { processLeadForCRM } = await import('@/lib/crm');
-          await processLeadForCRM(body, body.messages!, sessionId);
-        } catch (crmError) {
-          logSecurity('CRMProcessingError', { error: String(crmError) });
-        }
-      });
-    }
-
-    logAnalytics('LeadSubmitted', { 
-      ip, 
-      company,
+    logAnalytics('LeadSubmitted', {
       hasPhone: !!cleanPhone,
+      companyLength: company.length,
       timestamp: new Date().toISOString()
     });
 
     return NextResponse.json({
       success: true,
       leadId: data?.[0]?.id,
+      note: 'Inquiry successfully registered. We will be in touch shortly.'
     });
 
-  } catch (error) {
-    logSecurity('ServerError', { endpoint: '/api/leads', error: String(error) });
+  } catch {
+    logSecurity('ServerError', { endpoint: '/api/leads', code: 'LEAD_INTERNAL_EXCEPTION' });
     return NextResponse.json(
-      { error: 'An unexpected error occurred while processing your request' },
+      { error: 'An unexpected error occurred. Please contact raja@xaivon.com directly.' },
       { status: 500 }
     );
   }

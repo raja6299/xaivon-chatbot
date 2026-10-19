@@ -1,27 +1,22 @@
-import { SemanticChunker } from './chunking/semantic';
+import { SearchResult } from './types';
+import { XAIVON_APPROVED_FACTS } from '../knowledge/XAIVON_APPROVED_FACTS';
 import { knowledgeBase } from '../knowledge-base';
-import { MockEmbeddingProvider } from './embeddings/mock';
-import { DocumentMetadata, EmbeddingProvider, RAGConfig, SearchResult, VectorStore } from './types';
-import { SupabaseVectorStore } from './vector/supabase';
+
+interface KnowledgeChunk {
+  id: string;
+  source: string;
+  section: string;
+  text: string;
+  keywords: string[];
+}
 
 export class RAGManager {
   private static instance: RAGManager;
-  private chunker: SemanticChunker;
-  private embedder: EmbeddingProvider;
-  private store: VectorStore;
-  private config: RAGConfig;
+  private chunks: KnowledgeChunk[] = [];
+  private isInitialized = false;
 
-  private constructor(config?: Partial<RAGConfig>) {
-    this.config = {
-      chunkSize: 1000,
-      chunkOverlap: 200,
-      ...config
-    };
-    
-    // Default provider initializations (Can be injected/swapped for production)
-    this.chunker = new SemanticChunker(this.config.chunkSize, this.config.chunkOverlap);
-    this.embedder = new MockEmbeddingProvider(384); // Assuming 384 dim matches VECTOR(384) in SQL
-    this.store = new SupabaseVectorStore();
+  private constructor() {
+    this.buildKnowledgeChunks();
   }
 
   public static getInstance(): RAGManager {
@@ -31,98 +26,155 @@ export class RAGManager {
     return RAGManager.instance;
   }
 
-  private isInitialized = false;
+  private buildKnowledgeChunks() {
+    const chunks: KnowledgeChunk[] = [];
 
-  /**
-   * Initializes the RAG system with default internal knowledge base if empty.
-   */
-  public async initializeWithDefaults(): Promise<void> {
-    if (this.isInitialized) return;
-    this.isInitialized = true;
+    // Chunk 1: Company Profile & Founder
+    chunks.push({
+      id: 'company-overview',
+      source: 'XAIVON Approved Facts',
+      section: 'Company Profile',
+      text: `${XAIVON_APPROVED_FACTS.brandName} (operated by ${XAIVON_APPROVED_FACTS.legalEntity}, ${XAIVON_APPROVED_FACTS.entityType}) is an AI infrastructure and workflow orchestration consultancy founded by ${XAIVON_APPROVED_FACTS.founder} (${XAIVON_APPROVED_FACTS.founderTitle}). Contact email: ${XAIVON_APPROVED_FACTS.email}, Phone: ${XAIVON_APPROVED_FACTS.phone}. Serving clients across: ${XAIVON_APPROVED_FACTS.geographiesServed.join(', ')}.`,
+      keywords: ['xaivon', 'adabhra', 'raja', 'founder', 'ceo', 'company', 'location', 'phone', 'contact', 'email', 'about', 'who']
+    });
 
-    // Convert knowledge base JSON to a markdown-like string for chunking
-    let kbText = `# Company Overview\n${knowledgeBase.company.name}: ${knowledgeBase.company.tagline}\n${knowledgeBase.company.description}\nWebsite: ${knowledgeBase.company.website}\n\n`;
-    
-    kbText += `# Services & Pricing\n`;
-    knowledgeBase.services.forEach(s => {
-      kbText += `## ${s.category}\n${s.description}\n`;
-      s.tiers.forEach(t => {
-        kbText += `- ${t.name}: ${t.price} (${t.includes.join(', ')})\n`;
+    // Chunk 2: Services & Offerings
+    for (const service of XAIVON_APPROVED_FACTS.services) {
+      chunks.push({
+        id: `service-${service.id}`,
+        source: 'XAIVON Approved Facts',
+        section: service.title,
+        text: `### ${service.title}\nCategory: ${service.category}\nDescription: ${service.description}\nCapabilities:\n${service.features.map(f => `- ${f}`).join('\n')}\nPricing Policy: ${service.priceGuidance}`,
+        keywords: [
+          ...service.title.toLowerCase().split(/\s+/),
+          ...service.category.toLowerCase().split(/\s+/),
+          service.id,
+          'service',
+          'features',
+          'capability',
+          'pricing',
+          'cost',
+          'price'
+        ]
       });
+    }
+
+    // Chunk 2b: Industry Focus — Logistics & Freight Automation
+    chunks.push({
+      id: 'industry-logistics-freight',
+      source: 'XAIVON Approved Facts',
+      section: 'Industry Focus: Logistics & Freight Automation',
+      text: `### Logistics & Freight Workflow Automation (Primary Industry Focus)\nXAIVON specializes in automated quote intake, load dispatch pipelines, and document processing for freight brokers, 3PLs, and motor carriers. Capabilities include parsing rate confirmations and bills of lading (BOLs), carrier communication pipelines, and connecting dispatch tools with internal accounting systems.`,
+      keywords: ['logistics', 'freight', 'dispatch', 'carrier', 'broker', 'bol', 'loads', 'trucking', 'shipping', 'transport', '3pl', 'workflow']
     });
 
-    kbText += `\n# FAQ\n`;
-    knowledgeBase.faq.forEach(f => {
-      kbText += `Q: ${f.question}\nA: ${f.answer}\n\n`;
+    // Chunk 3: Integrations & Tech Stack
+    chunks.push({
+      id: 'supported-integrations',
+      source: 'XAIVON Approved Facts',
+      section: 'Supported Integrations',
+      text: `XAIVON integrates with core business tools including: ${XAIVON_APPROVED_FACTS.integrations.join(', ')}, plus custom REST APIs, databases (PostgreSQL/Supabase), and secure event webhooks.`,
+      keywords: ['integration', 'integrations', 'hubspot', 'slack', 'salesforce', 'quickbooks', 'teams', 'tools', 'connect', 'api', 'webhook']
     });
 
-    await this.addDocument(kbText, {
-      documentId: 'internal-kb-001',
-      documentName: 'XAIVON Internal Knowledge Base',
-      source: 'System',
-      section: 'Core Knowledge',
-      uploadTime: new Date().toISOString()
+    // Chunk 4: Implementation Process
+    chunks.push({
+      id: 'implementation-process',
+      source: 'XAIVON Approved Facts',
+      section: 'Delivery & Deployment Process',
+      text: `XAIVON Implementation Methodology:\n${XAIVON_APPROVED_FACTS.implementationProcess.join('\n')}\nTimeline: Scoping and timelines are tailored upon discovery; initial prototypes and pilots are phased over several weeks depending on system integrations and validation checkpoints.`,
+      keywords: ['timeline', 'process', 'how long', 'weeks', 'deploy', 'implementation', 'steps', 'audit', 'discovery', 'pilot']
     });
+
+    // Chunk 5: FAQ & Policies
+    for (let i = 0; i < knowledgeBase.faq.length; i++) {
+      const faq = knowledgeBase.faq[i];
+      chunks.push({
+        id: `faq-${i + 1}`,
+        source: 'XAIVON Knowledge Base FAQ',
+        section: 'Frequently Asked Questions',
+        text: `Q: ${faq.question}\nA: ${faq.answer}`,
+        keywords: [
+          ...faq.question.toLowerCase().split(/\W+/).filter(w => w.length > 2),
+          'faq',
+          'question'
+        ]
+      });
+    }
+
+    this.chunks = chunks;
+    this.isInitialized = true;
+  }
+
+  public async initializeWithDefaults(): Promise<void> {
+    if (!this.isInitialized) {
+      this.buildKnowledgeChunks();
+    }
   }
 
   /**
-   * Add a new document to the RAG Knowledge Base.
-   * Performs Semantic Chunking -> Embedding -> Vector Store Insertion
+   * Deterministic keyword & token matching retrieval.
+   * Read-only, zero network calls, zero external side effects.
    */
-  public async addDocument(text: string, metadata: DocumentMetadata): Promise<void> {
-    if (!text || text.trim() === '') return;
-
-    // 1. Chunking
-    const chunks = this.chunker.chunkText(text, metadata);
-    if (chunks.length === 0) return;
-
-    // 2. Embedding (Batch)
-    const chunkTexts = chunks.map(c => c.text);
-    const embeddings = await this.embedder.embedBatch(chunkTexts);
-
-    // 3. Merging
-    const chunksWithEmbeddings = chunks.map((chunk, i) => ({
-      ...chunk,
-      embedding: embeddings[i]
-    }));
-
-    // 4. Indexing
-    await this.store.addChunks(chunksWithEmbeddings);
-  }
-
-  /**
-   * Retrieve the most relevant chunks for a given query.
-   * Performs Semantic Search -> Thresholding -> Deduplication
-   */
-  public async retrieveContext(query: string, topK: number = 5, threshold: number = 0.5): Promise<SearchResult[]> {
+  public async retrieveContext(query: string, topK: number = 4, threshold: number = 0.1): Promise<SearchResult[]> {
     if (!query || query.trim() === '') return [];
 
-    // 1. Embed Query
-    const queryEmbedding = await this.embedder.embedText(query);
+    const normalizedQuery = query.toLowerCase().trim();
+    const queryTokens = normalizedQuery.split(/\W+/).filter(token => token.length > 2);
 
-    // 2. Semantic Search
-    let results = await this.store.search(queryEmbedding, topK * 2, threshold);
+    if (queryTokens.length === 0) return [];
 
-    // 3. Deduplication (e.g. Exact same chunk ID or heavily overlapping text)
-    // For simplicity, we just take unique chunks based on ID
-    const uniqueMap = new Map<string, SearchResult>();
-    for (const res of results) {
-      if (!uniqueMap.has(res.id)) {
-        uniqueMap.set(res.id, res);
+    const scored = this.chunks.map(chunk => {
+      let score = 0;
+      const lowerText = chunk.text.toLowerCase();
+      const lowerSection = chunk.section.toLowerCase();
+
+      // Direct phrase match
+      if (lowerText.includes(normalizedQuery)) {
+        score += 3.0;
       }
-    }
-    
-    results = Array.from(uniqueMap.values());
-    
-    // Sort and limit
-    results.sort((a, b) => b.score - a.score);
-    return results.slice(0, topK);
+
+      // Keyword & token matches
+      for (const token of queryTokens) {
+        if (chunk.keywords.includes(token)) {
+          score += 1.5;
+        }
+        if (lowerSection.includes(token)) {
+          score += 1.0;
+        }
+        if (lowerText.includes(token)) {
+          score += 0.5;
+        }
+      }
+
+      // Normalize score between 0 and 1
+      const normalizedScore = Math.min(score / (queryTokens.length * 2.5 || 1), 1.0);
+
+      return {
+        id: chunk.id,
+        text: chunk.text,
+        metadata: {
+          documentId: chunk.id,
+          documentName: chunk.source,
+          source: 'Internal Verified Facts',
+          section: chunk.section,
+          uploadTime: '2026-10-19'
+        },
+        score: normalizedScore
+      };
+    });
+
+    const filtered = scored.filter(item => item.score >= threshold);
+    filtered.sort((a, b) => b.score - a.score);
+
+    return filtered.slice(0, topK);
   }
 
-  /**
-   * Remove a document and all its chunks from the RAG index
-   */
-  public async removeDocument(documentId: string): Promise<void> {
-    await this.store.removeDocument(documentId);
+  public async addDocument(): Promise<void> {
+    // No-op for read-only safety in production
+  }
+
+  public async removeDocument(): Promise<void> {
+    // No-op for read-only safety in production
   }
 }

@@ -35,17 +35,17 @@ const stripHtml = (v: string): string => v.replace(/<[^>]*>/g, '');
 /** Sanitise a raw input value: trim + strip HTML */
 const sanitize = (v: string): string => stripHtml(v).trim();
 
-/** Count letter characters (any script) */
-const letterCount = (v: string): number => (v.match(/\p{L}/gu) ?? []).length;
+/** Count letter characters (any script including Indic matras) */
+const letterCount = (v: string): number => (v.match(/[\p{L}\p{M}]/gu) ?? []).length;
 
 /** Check if string is purely digits */
 const isPureDigits = (v: string): boolean => /^\d+$/.test(v);
 
 /** Check if string is purely non-letter / non-digit symbols */
 const isPureSymbols = (v: string): boolean =>
-  v.length > 0 && !/\p{L}/u.test(v) && !/\d/.test(v);
+  v.length > 0 && !/[\p{L}\p{M}]/u.test(v) && !/\d/.test(v);
 
-const NAME_RE = /^[a-zA-Z\s\-']+$/;
+const NAME_RE = /^[\p{L}\p{M}\s\-\.']+$/u;
 const EMAIL_RE = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
 
 function validateField(name: FieldName, raw: string): string {
@@ -405,7 +405,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
       return 'border-red-500/50 focus:ring-1 focus:ring-red-500/30';
     if (state === 'valid')
       return 'border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/20';
-    return 'border-violet-500/10 focus:border-violet-500/30 focus:ring-1 focus:ring-violet-500/20';
+    return 'border-[var(--border-glass)] focus:border-[var(--copper-primary)] focus:ring-1 focus:ring-[var(--copper-primary)]/20';
   };
 
   // -- Inline validation indicator ------------------------------------------
@@ -419,7 +419,6 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
     );
   };
 
-
   return (
     <div
       className="lead-form-overlay"
@@ -428,15 +427,15 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
       aria-label="Schedule a free consultation"
     >
       <div ref={modalRef} className="w-full max-w-[340px] mx-3 animate-slide-up">
-        <div className="bg-[#111827]/95 border border-violet-500/20 rounded-2xl shadow-2xl shadow-violet-500/5">
+        <div className="bg-[var(--bg-panel)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl">
           {/* ---- Header -------------------------------------------------- */}
-          <div className="px-5 pt-5 pb-3 border-b border-violet-500/10">
+          <div className="px-5 pt-5 pb-3 border-b border-[var(--border-glass)]">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-white font-semibold text-sm">
+                <h2 className="text-[var(--text-primary)] font-semibold text-sm font-heading">
                   {t('form.title')}
                 </h2>
-                <p className="text-slate-400 text-[11px] mt-0.5">
+                <p className="text-[var(--text-secondary)] text-[11px] mt-0.5">
                   We&apos;ll get back to you within 24 hours.
                 </p>
               </div>
@@ -519,7 +518,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                       disabled={formStatus === 'submitting'}
                       placeholder="John Smith"
                       maxLength={60}
-                      className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 pr-9 placeholder-slate-600 transition-all duration-200 outline-none border ${inputBorderClass('fullName')} disabled:opacity-40`}
+                      className={`w-full bg-[var(--bg-input)] text-[var(--text-primary)] text-sm rounded-xl px-3.5 py-2.5 pr-9 placeholder-[var(--text-muted)] transition-all duration-200 outline-none border ${inputBorderClass('fullName')} disabled:opacity-40`}
                       autoComplete="name"
                       aria-required="true"
                       aria-invalid={fieldState('fullName') === 'invalid' || undefined}
@@ -558,7 +557,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                       onBlur={handleBlur}
                       disabled={formStatus === 'submitting'}
                       placeholder="john@company.com"
-                      className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 pr-9 placeholder-slate-600 transition-all duration-200 outline-none border ${inputBorderClass('email')} disabled:opacity-40`}
+                      className={`w-full bg-[var(--bg-input)] text-[var(--text-primary)] text-sm rounded-xl px-3.5 py-2.5 pr-9 placeholder-[var(--text-muted)] transition-all duration-200 outline-none border ${inputBorderClass('email')} disabled:opacity-40`}
                       autoComplete="email"
                       aria-required="true"
                       aria-invalid={fieldState('email') === 'invalid' || undefined}
@@ -598,7 +597,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                       disabled={formStatus === 'submitting'}
                       placeholder="Acme Inc."
                       maxLength={100}
-                      className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2.5 pr-9 placeholder-slate-600 transition-all duration-200 outline-none border ${inputBorderClass('company')} disabled:opacity-40`}
+                      className={`w-full bg-[var(--bg-input)] text-[var(--text-primary)] text-sm rounded-xl px-3.5 py-2.5 pr-9 placeholder-[var(--text-muted)] transition-all duration-200 outline-none border ${inputBorderClass('company')} disabled:opacity-40`}
                       autoComplete="organization"
                       aria-required="true"
                       aria-invalid={fieldState('company') === 'invalid' || undefined}
@@ -637,7 +636,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                       disabled={formStatus === 'submitting'}
                       placeholder="+1 (555) 000-0000"
                       defaultCountry="US"
-                      className={`w-full bg-[#0c1120] text-white text-sm rounded-xl px-3.5 py-2 pr-9 placeholder-slate-600 transition-all duration-200 outline-none border ${inputBorderClass('phone')} disabled:opacity-40 [&_.PhoneInputCountryIcon]:w-6 [&_.PhoneInputCountryIcon]:h-4 [&_.PhoneInputCountryIcon--border]:border-none [&_.PhoneInputInput]:bg-transparent [&_.PhoneInputInput]:outline-none [&_.PhoneInputInput]:text-white [&_.PhoneInputCountrySelect]:bg-[#1a2035] [&_.PhoneInputCountrySelect]:text-white [&_.PhoneInputCountrySelect]:border-0 [&_.PhoneInputCountrySelect]:outline-none [&_.PhoneInputCountrySelectArrow]:text-slate-400`}
+                      className={`w-full bg-[var(--bg-input)] text-[var(--text-primary)] text-sm rounded-xl px-3.5 py-2 pr-9 placeholder-[var(--text-muted)] transition-all duration-200 outline-none border ${inputBorderClass('phone')} disabled:opacity-40 [&_.PhoneInputCountryIcon]:w-6 [&_.PhoneInputCountryIcon]:h-4 [&_.PhoneInputCountryIcon--border]:border-none [&_.PhoneInputInput]:bg-transparent [&_.PhoneInputInput]:outline-none [&_.PhoneInputInput]:text-[var(--text-primary)] [&_.PhoneInputCountrySelect]:bg-[var(--bg-surface)] [&_.PhoneInputCountrySelect]:text-[var(--text-primary)] [&_.PhoneInputCountrySelect]:border-0 [&_.PhoneInputCountrySelect]:outline-none [&_.PhoneInputCountrySelectArrow]:text-[var(--text-muted)]`}
                       autoComplete="tel"
                       aria-invalid={fieldState('phone') === 'invalid' || undefined}
                       aria-describedby={
@@ -660,23 +659,32 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                 {/* ---- Global error ---- */}
                 {formStatus === 'error' && (
                   <div
-                    className="flex items-center gap-2 bg-red-900/20 border border-red-500/20 rounded-xl px-3 py-2.5 animate-fade-in-up"
+                    className="flex flex-col gap-2.5 bg-red-950/30 border border-red-500/25 rounded-xl p-3 animate-fade-in-up"
                     role="alert"
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#f87171"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      aria-hidden="true"
+                    <div className="flex items-start gap-2">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#f87171"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        className="shrink-0 mt-0.5"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M15 9l-6 6M9 9l6 6" />
+                      </svg>
+                      <span className="text-red-300 text-xs leading-relaxed">{errorMessage}</span>
+                    </div>
+                    <a
+                      href={`mailto:raja@xaivon.com?subject=${encodeURIComponent(`Consultation Inquiry from ${formData.fullName || 'Prospective Client'} (${formData.company || 'Enterprise'})`)}&body=${encodeURIComponent(`Full Name: ${formData.fullName}\nCompany: ${formData.company}\nEmail: ${formData.email}\nPhone: ${formData.phone || 'N/A'}\n\n[Inquiry submitted via XAIVON AI Consultant]`)}`}
+                      className="inline-flex items-center justify-center gap-1.5 text-xs font-medium py-1.5 px-3 rounded-lg bg-[var(--copper-primary)] hover:bg-[var(--copper-light)] text-white transition-colors text-center"
                     >
-                      <circle cx="12" cy="12" r="10" />
-                      <path d="M15 9l-6 6M9 9l6 6" />
-                    </svg>
-                    <span className="text-red-300 text-xs">{errorMessage}</span>
+                      Email Founder Directly (raja@xaivon.com)
+                    </a>
                   </div>
                 )}
 
@@ -684,7 +692,7 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                 <button
                   type="submit"
                   disabled={formStatus === 'submitting'}
-                  className={`w-full font-medium text-sm py-2.5 rounded-xl transition-all duration-200 shadow-lg flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white shadow-violet-500/15 hover:shadow-violet-500/25 disabled:opacity-50 disabled:hover:from-violet-600 disabled:hover:to-purple-600`}
+                  className={`w-full font-medium text-sm py-2.5 rounded-xl transition-all duration-200 shadow-md flex items-center justify-center gap-2 bg-[var(--copper-primary)] hover:bg-[var(--copper-light)] text-white shadow-[var(--shadow-button)] disabled:opacity-50`}
                   aria-label={
                     formStatus === 'submitting'
                       ? 'Submitting form'

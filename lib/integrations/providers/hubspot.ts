@@ -5,12 +5,13 @@ export class HubSpotProvider implements IntegrationProvider {
   name = 'HubSpot CRM';
   type = 'api_key' as const;
 
-  async execute(_payload: Record<string, unknown>): Promise<IntegrationResult> {
-    // Mocking HubSpot API for this phase. 
+  async execute(payload: Record<string, unknown>): Promise<IntegrationResult> {
+    void payload;
+    // Mocking HubSpot API for this phase.
     // In production, this uses the official @hubspot/api-client or fetch
-    
+
     const HUBSPOT_API_KEY = process.env.HUBSPOT_API_KEY;
-    
+
     if (!HUBSPOT_API_KEY) {
       // Mock HubSpot: would sync contact in production
       return {
