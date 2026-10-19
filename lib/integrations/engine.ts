@@ -1,128 +1,186 @@
 import { JobConfig, IntegrationResult, WebhookConfig } from './types';
 
-// In-memory queue for demonstration (use Redis/SQS for production)
-const jobQueue: Map<string, JobConfig> = new Map();
+// In-memory record for observability
 const jobResults: Map<string, IntegrationResult> = new Map();
 
-/**
- * Execute a job asynchronously in the background.
- * Uses fire-and-forget to avoid blocking the streaming response.
- */
-export function enqueueJob(
-  job: JobConfig,
-  executeFn: (payload: Record<string, unknown>) => Promise<unknown>
-): string {
-  jobQueue.set(job.id, job);
+// Strict list of allowed external webhook hostnames (server-controlled)
+const ALLOWED_WEBHOOK_HOSTS = new Set([
+  'hooks.zapier.com',
+  'hooks.slack.com',
+  'api.hubspot.com',
+  'maker.ifttt.com'
+]);
 
-  // Run in background without awaiting
-  if (typeof setImmediate !== 'undefined') {
-    setImmediate(() => processJob(job, executeFn));
-  } else {
-    setTimeout(() => processJob(job, executeFn), 0);
+/**
+ * Checks whether an IP or hostname is private or reserved (SSRF protection).
+ */
+export function isPrivateOrReservedHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase().trim();
+
+  // Localhost & internal domain names
+  if (
+    normalized === 'localhost' ||
+    normalized.endsWith('.local') ||
+    normalized.endsWith('.internal') ||
+    normalized.endsWith('.localhost')
+  ) {
+    return true;
   }
 
-  return job.id;
+  // IPv4 checks
+  const ipv4Match = normalized.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4Match) {
+    const [b0, b1] = [parseInt(ipv4Match[1], 10), parseInt(ipv4Match[2], 10)];
+    if (b0 === 0) return true; // 0.0.0.0/8
+    if (b0 === 10) return true; // 10.0.0.0/8
+    if (b0 === 127) return true; // 127.0.0.0/8 Loopback
+    if (b0 === 169 && b1 === 254) return true; // 169.254.0.0/16 Link-local / AWS/GCP metadata
+    if (b0 === 172 && b1 >= 16 && b1 <= 31) return true; // 172.16.0.0/12
+    if (b0 === 192 && b1 === 168) return true; // 192.168.0.0/16
+    if (b0 >= 224) return true; // 224.0.0.0/4 Multicast / reserved
+  }
+
+  // IPv6 loopback / link-local / unique local
+  if (
+    normalized === '::1' ||
+    normalized.startsWith('fe80:') ||
+    normalized.startsWith('fc') ||
+    normalized.startsWith('fd')
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
- * Process a job with exponential backoff retry logic.
+ * Strict server-side webhook destination validator
  */
-async function processJob(
-  job: JobConfig,
-  executeFn: (payload: Record<string, unknown>) => Promise<unknown>,
-  attempt = 1
-): Promise<void> {
-  const startTime = Date.now();
-  
+export function validateWebhookDestination(urlString: string): URL {
+  let url: URL;
   try {
-    // Add timeout handling
+    url = new URL(urlString);
+  } catch {
+    throw new Error('Invalid webhook URL format');
+  }
+
+  if (url.protocol !== 'https:') {
+    throw new Error('Insecure protocol. Webhooks must strictly use HTTPS.');
+  }
+
+  if (isPrivateOrReservedHost(url.hostname)) {
+    throw new Error('Access to private or internal network addresses is forbidden.');
+  }
+
+  // Verify against server-controlled domain allowlist if configured
+  if (!ALLOWED_WEBHOOK_HOSTS.has(url.hostname.toLowerCase())) {
+    throw new Error(`Destination host '${url.hostname}' is not in the approved integration allowlist.`);
+  }
+
+  return url;
+}
+
+/**
+ * Safe, synchronous webhook execution with bounded timeout and redirect protection
+ */
+export async function executeWebhook(config: WebhookConfig, payload: Record<string, unknown>) {
+  const verifiedUrl = validateWebhookDestination(config.url);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s max timeout
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'User-Agent': 'XAIVON-Integration-Engine/2.0',
+    ...(config.headers || {})
+  };
+
+  if (config.secret) {
+    headers['X-Xaivon-Signature'] = config.secret;
+  }
+
+  try {
+    const response = await fetch(verifiedUrl.toString(), {
+      method: config.method,
+      headers,
+      body: config.method !== 'GET' ? JSON.stringify(payload) : undefined,
+      signal: controller.signal,
+      redirect: 'manual' // Prevent SSRF via open redirects
+    });
+
+    clearTimeout(timeoutId);
+
+    if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+      throw new Error('Webhook redirects are disallowed for security reasons.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Integration endpoint returned HTTP ${response.status}`);
+    }
+
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { data: text };
+    }
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
+/**
+ * Synchronous execution for durable side effects
+ */
+export async function executeIntegrationJob(
+  job: JobConfig,
+  executeFn: (payload: Record<string, unknown>) => Promise<unknown>
+): Promise<IntegrationResult> {
+  const startTime = Date.now();
+  try {
     const result = await Promise.race([
       executeFn(job.payload),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Job timeout')), job.timeoutMs)
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Job timeout')), job.timeoutMs || 10000)
       )
     ]);
 
     const duration = Date.now() - startTime;
-    jobResults.set(job.id, {
+    const res: IntegrationResult = {
       success: true,
       providerId: job.providerId,
       jobId: job.id,
       durationMs: duration,
       response: result,
-      retries: attempt - 1
-    });
-    
-    jobQueue.delete(job.id);
-    
-  } catch (error) {
+      retries: 0
+    };
+    jobResults.set(job.id, res);
+    return res;
+  } catch (err) {
     const duration = Date.now() - startTime;
-    const isNetworkError = error instanceof Error && (
-      error.message.includes('timeout') || 
-      error.message.includes('fetch') || 
-      error.message.includes('network')
-    );
-
-    // Only retry safe failures (e.g. network/timeouts, not 400 Bad Request)
-    if (attempt <= job.maxRetries && isNetworkError) {
-      const backoffMs = Math.min(1000 * Math.pow(2, attempt), 10000); // 2s, 4s, 8s, max 10s
-      setTimeout(() => processJob(job, executeFn, attempt + 1), backoffMs);
-    } else {
-      jobResults.set(job.id, {
-        success: false,
-        providerId: job.providerId,
-        jobId: job.id,
-        durationMs: duration,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        retries: attempt - 1
-      });
-      jobQueue.delete(job.id);
-    }
+    const res: IntegrationResult = {
+      success: false,
+      providerId: job.providerId,
+      jobId: job.id,
+      durationMs: duration,
+      error: err instanceof Error ? err.message : 'Unknown integration error',
+      retries: 0
+    };
+    jobResults.set(job.id, res);
+    return res;
   }
 }
 
-/**
- * Reusable Webhook Engine
- */
-export async function executeWebhook(config: WebhookConfig, payload: Record<string, unknown>) {
-  // Validate and sanitize URL to prevent SSRF
-  try {
-    const url = new URL(config.url);
-    if (['localhost', '127.0.0.1', '169.254.169.254'].includes(url.hostname)) {
-      throw new Error('Blocked internal IP request (SSRF prevention)');
-    }
-  } catch {
-    throw new Error('Invalid webhook URL');
-  }
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'User-Agent': 'XAIVON-Integration-Engine/1.0',
-    ...(config.headers || {})
-  };
-
-  if (config.secret) {
-    // Simple signature header (in prod use HMAC SHA256)
-    headers['X-Xaivon-Signature'] = config.secret; 
-  }
-
-  const response = await fetch(config.url, {
-    method: config.method,
-    headers,
-    body: config.method !== 'GET' ? JSON.stringify(payload) : undefined,
-    // Note: Next.js fetch doesn't use standard timeout options easily, but our job queue handles Promise.race timeouts
+export function enqueueJob(
+  job: JobConfig,
+  executeFn: (payload: Record<string, unknown>) => Promise<unknown>
+): string {
+  // Execute safely without crashing the event loop or claiming unverified completion
+  executeIntegrationJob(job, executeFn).catch((err) => {
+    console.warn(`[IntegrationJob] Failed for ${job.providerId}:`, err);
   });
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  const text = await response.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { data: text };
-  }
+  return job.id;
 }
 
 export function getJobResult(jobId: string): IntegrationResult | undefined {

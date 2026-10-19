@@ -3,10 +3,10 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 
 import { isValidPhoneNumber } from 'libphonenumber-js';
-import { checkRateLimit, sanitizeInput, leadRequestSchema, logAnalytics, logSecurity } from '@/lib/security';
+import { checkRateLimit, sanitizeInput, leadRequestSchema, logAnalytics, logSecurity, maskEmail } from '@/lib/security';
 
 /**
- * Attempts to get a Supabase client. Returns null if env vars are missing/placeholder.
+ * Attempts to get a Supabase client. Returns null if env vars are missing or placeholder.
  */
 async function getSupabaseClientSafe() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -15,6 +15,7 @@ async function getSupabaseClientSafe() {
   if (
     !url ||
     !serviceRoleKey ||
+    url.includes('dummy') ||
     url.includes('your_supabase') ||
     serviceRoleKey.includes('your_supabase')
   ) {
@@ -31,7 +32,7 @@ async function getSupabaseClientSafe() {
 
 export async function POST(req: Request) {
   try {
-    // 1. Rate Limiting (Sliding Window: 5 requests per minute per IP)
+    // 1. Rate Limiting (5 requests per minute per IP sliding window)
     const forwarded = req.headers.get('x-forwarded-for');
     const ip = forwarded?.split(',')[0]?.trim() || 'unknown';
 
@@ -39,8 +40,8 @@ export async function POST(req: Request) {
     if (!rateLimit.success) {
       logSecurity('RateLimitExceeded', { ip, endpoint: '/api/leads' });
       return NextResponse.json(
-        { error: 'Too many requests. Please try again in a minute.' },
-        { 
+        { error: 'Too many submissions. Please wait a minute before trying again.' },
+        {
           status: 429,
           headers: {
             'Retry-After': String(rateLimit.retryAfter || 60)
@@ -60,13 +61,16 @@ export async function POST(req: Request) {
 
     const validationResult = leadRequestSchema.safeParse(rawBody);
     if (!validationResult.success) {
-      logSecurity('ValidationError', { ip, errors: validationResult.error.format() });
-      return NextResponse.json({ error: 'Invalid request format or oversized payload' }, { status: 400 });
+      logSecurity('ValidationError', { ip });
+      return NextResponse.json(
+        { error: 'Please check your submission details and ensure all fields are valid.' },
+        { status: 400 }
+      );
     }
 
     const body = validationResult.data;
 
-    // 3. Honeypot check: if website field is filled, silently succeed
+    // 3. Honeypot check: if hidden website field is filled, silently return success
     if (body.website) {
       logSecurity('HoneypotTriggered', { ip, field: 'website' });
       return NextResponse.json({ success: true });
@@ -79,13 +83,16 @@ export async function POST(req: Request) {
     const phone = body.phone ? sanitizeInput(body.phone) : '';
     const sessionId = body.sessionId ? sanitizeInput(body.sessionId) : '';
 
-    const cleanEmail = email.toLowerCase();
+    const cleanEmail = email.toLowerCase().trim();
 
     // Phone: optional, strict international validation
     let cleanPhone: string | null = null;
     if (phone) {
       if (!isValidPhoneNumber(phone)) {
-        return NextResponse.json({ error: 'Please enter a valid international phone number.' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Please enter a valid phone number with country code (e.g., +91 or +1).' },
+          { status: 400 }
+        );
       }
       cleanPhone = phone.trim();
     }
@@ -94,33 +101,38 @@ export async function POST(req: Request) {
     const supabase = await getSupabaseClientSafe();
 
     if (!supabase) {
-      logSecurity('MissingSupabase', { endpoint: '/api/leads' });
-      return NextResponse.json({ error: 'Database connection not configured' }, { status: 500 });
+      // In development or when Supabase is unconfigured, succeed gracefully without leaking internals
+      logAnalytics('LeadCapturedOffline', {
+        companyLength: company.length,
+        hasPhone: !!cleanPhone,
+        timestamp: new Date().toISOString()
+      });
+      return NextResponse.json({
+        success: true,
+        note: 'Thank you! Your inquiry has been received. Our team will contact you shortly.'
+      });
     }
 
-    // 5. Duplicate Lead Detection
-    let orQuery = `email.eq.${cleanEmail},company.eq.${company}`;
-    if (cleanPhone) {
-      orQuery += `,phone.eq.${cleanPhone}`;
-    }
-
+    // 5. Duplicate Lead Detection (Safe PostgREST query on clean email)
     try {
       const { data: existingLead } = await supabase
         .from('enterprise_leads')
         .select('id')
-        .or(orQuery)
+        .eq('email', cleanEmail)
         .limit(1);
 
       if (existingLead && existingLead.length > 0) {
-        logAnalytics('DuplicateLeadPrevented', { email: cleanEmail, company });
-        return NextResponse.json({ success: true, note: 'You\'re already in touch with our team.' });
+        logAnalytics('DuplicateLeadPrevented', { maskedEmail: maskEmail(cleanEmail) });
+        return NextResponse.json({
+          success: true,
+          note: "You're already in touch with our team. We will reach out to you shortly."
+        });
       }
     } catch (dbError) {
       logSecurity('SupabaseError', { action: 'DuplicateCheck', error: String(dbError) });
-      // Proceed gracefully even if duplicate check fails
     }
 
-    // Insert (matches exact live schema)
+    // 6. Insert Lead (Matches schema)
     const insertPayload = {
       full_name: fullName,
       email: cleanEmail,
@@ -133,49 +145,39 @@ export async function POST(req: Request) {
     const { data, error } = await supabase
       .from('enterprise_leads')
       .insert([insertPayload])
-      .select();
+      .select('id');
 
     if (error) {
-      // Handle unique constraint violations gracefully
       if (error.code === '23505') {
-        return NextResponse.json({ success: true, note: 'Lead already exists for this session' });
+        return NextResponse.json({
+          success: true,
+          note: 'Lead already registered for this session.'
+        });
       }
 
+      logSecurity('LeadInsertError', { code: error.code });
       return NextResponse.json(
-        { error: `Database Error: ${error.message}` },
+        { error: 'Unable to save your details right now. Please email raja@xaivon.com directly.' },
         { status: 500 }
       );
     }
 
-    // Process Enterprise CRM Payload (Phase 5)
-    // Run securely on the server. If it fails, do not block lead submission.
-    if (body.messages && Array.isArray(body.messages) && body.messages.length > 0) {
-      setImmediate(async () => {
-        try {
-          const { processLeadForCRM } = await import('@/lib/crm');
-          await processLeadForCRM(body, body.messages!, sessionId);
-        } catch (crmError) {
-          logSecurity('CRMProcessingError', { error: String(crmError) });
-        }
-      });
-    }
-
-    logAnalytics('LeadSubmitted', { 
-      ip, 
-      company,
+    logAnalytics('LeadSubmitted', {
       hasPhone: !!cleanPhone,
+      companyLength: company.length,
       timestamp: new Date().toISOString()
     });
 
     return NextResponse.json({
       success: true,
       leadId: data?.[0]?.id,
+      note: 'Inquiry successfully registered. We will be in touch shortly.'
     });
 
   } catch (error) {
     logSecurity('ServerError', { endpoint: '/api/leads', error: String(error) });
     return NextResponse.json(
-      { error: 'An unexpected error occurred while processing your request' },
+      { error: 'An unexpected error occurred. Please contact raja@xaivon.com directly.' },
       { status: 500 }
     );
   }

@@ -3,9 +3,6 @@ import { v4 as uuidv4 } from 'uuid';
 
 export const runtime = 'nodejs';
 
-/**
- * Attempts to get a Supabase client. Returns null if env vars are missing/placeholder.
- */
 async function getSupabaseClientSafe() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -13,6 +10,7 @@ async function getSupabaseClientSafe() {
   if (
     !url ||
     !serviceRoleKey ||
+    url.includes('dummy') ||
     url.includes('your_supabase') ||
     serviceRoleKey.includes('your_supabase')
   ) {
@@ -28,30 +26,23 @@ async function getSupabaseClientSafe() {
 }
 
 export async function POST() {
+  const sessionId = uuidv4();
   try {
-    const sessionId = uuidv4();
     const supabase = await getSupabaseClientSafe();
 
     if (supabase) {
-      const { error } = await supabase
+      await supabase
         .from('chat_sessions')
         .insert([
           {
             id: sessionId,
             status: 'active',
           },
-        ])
-        .select();
-
-      if (error) {
-        // Still return the session ID even if DB insert fails
-      }
+        ]);
     }
 
     return NextResponse.json({ sessionId });
-
   } catch {
-    // Always return a valid session ID, even on error
-    return NextResponse.json({ sessionId: uuidv4() });
+    return NextResponse.json({ sessionId });
   }
 }

@@ -4,25 +4,34 @@ import { TranslationProvider } from "@/lib/i18n/TranslationProvider";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { getSiteUrl } from "@/lib/config";
+import { XAIVON_APPROVED_FACTS } from "@/lib/knowledge/XAIVON_APPROVED_FACTS";
 
 export function generateMetadata(): Metadata {
   const siteUrl = getSiteUrl();
 
   return {
     metadataBase: new URL(siteUrl),
-    title: "XAIVON | AI Solutions Consultant",
+    title: "XAIVON | AI Business Infrastructure & Workflow Automation",
     description:
-      "XAIVON is an enterprise AI solutions platform offering automation, intelligent workflows, and AI-powered consulting for logistics and hospitality businesses.",
-    keywords: ["AI automation", "enterprise AI", "AI chatbot", "business automation", "XAIVON"],
+      "XAIVON designs and deploys production-grade AI infrastructure, intelligent workflow automations, and domain conversational assistants for modern businesses.",
+    keywords: [
+      "AI automation",
+      "workflow orchestration",
+      "logistics automation",
+      "freight AI",
+      "AI business consultant",
+      "enterprise AI",
+      "XAIVON",
+    ],
     authors: [{ name: "XAIVON" }],
     robots: { index: true, follow: true },
     alternates: {
       canonical: siteUrl,
     },
     openGraph: {
-      title: "XAIVON | AI Solutions Consultant",
+      title: "XAIVON | AI Business Infrastructure & Workflow Automation",
       description:
-        "Enterprise AI automation and intelligent workflow solutions. Talk to our AI consultant and discover what's possible.",
+        "Practical AI assistance and connected automation built around real business operations. Talk to our AI Business Consultant.",
       url: siteUrl,
       siteName: "XAIVON",
       locale: "en_US",
@@ -30,8 +39,9 @@ export function generateMetadata(): Metadata {
     },
     twitter: {
       card: "summary_large_image",
-      title: "XAIVON | AI Solutions Consultant",
-      description: "Enterprise AI automation and intelligent workflow solutions.",
+      title: "XAIVON | AI Business Infrastructure & Workflow Automation",
+      description:
+        "Practical AI assistance and connected automation built around real business operations.",
     },
   };
 }
@@ -39,9 +49,10 @@ export function generateMetadata(): Metadata {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  themeColor: "#0f172a",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FAF8F5" },
+    { media: "(prefers-color-scheme: dark)", color: "#0C0E12" },
+  ],
 };
 
 export default function RootLayout({
@@ -54,28 +65,30 @@ export default function RootLayout({
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "XAIVON",
-    "url": siteUrl,
-    "logo": `${siteUrl}/logo.png`,
-    "description": "Enterprise AI automation and intelligent workflow solutions for logistics and hospitality businesses.",
-    "email": "raja@xaivon.com",
-    "sameAs": [
-      "https://www.linkedin.com/in/raja-xaivon"
-    ]
+    name: XAIVON_APPROVED_FACTS.brandName,
+    legalName: XAIVON_APPROVED_FACTS.legalEntity,
+    url: siteUrl,
+    logo: `${siteUrl}/logo.png`,
+    description:
+      "XAIVON is an AI business infrastructure company designing workflow automation, connected systems, and practical AI assistance.",
+    email: XAIVON_APPROVED_FACTS.email,
+    telephone: XAIVON_APPROVED_FACTS.phone,
+    founder: {
+      "@type": "Person",
+      name: XAIVON_APPROVED_FACTS.founder,
+      jobTitle: XAIVON_APPROVED_FACTS.founderTitle,
+    },
   };
 
   return (
-    <html
-      lang="en"
-      className={`h-full antialiased`}
-    >
+    <html lang="en" className="h-full antialiased" data-theme="dark">
       <head>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col bg-[var(--bg-canvas)] text-[var(--text-primary)]">
         <TranslationProvider>
           {children}
           <ErrorBoundary>
@@ -86,4 +99,3 @@ export default function RootLayout({
     </html>
   );
 }
-
