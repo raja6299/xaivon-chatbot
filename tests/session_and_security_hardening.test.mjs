@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import { signSessionId, verifySessionToken } from '../lib/security/session.ts';
 import { anonymizeIp, leadRequestSchema } from '../lib/security/index.ts';
+
+const require = createRequire(import.meta.url);
 
 test('Session Security - Cryptographic HMAC token generation & verification', () => {
   const sessionId = 'test-session-uuid-1234-5678';
@@ -26,7 +29,13 @@ test('Session Security - Cryptographic HMAC token generation & verification', ()
     'Session token must not authorize access to a foreign session ID'
   );
 
-  // 4. Malformed tokens fail safely without unhandled exceptions
+  // 4. Token expiration: Expired token must be rejected
+  const expiredToken = signSessionId(sessionId, -1000); // 1 second in the past
+  const expiredResult = verifySessionToken(expiredToken);
+  assert.equal(expiredResult.valid, false, 'Expired session token must be rejected');
+  assert.equal(expiredResult.reason, 'expired');
+
+  // 5. Malformed tokens fail safely without unhandled exceptions
   assert.equal(verifySessionToken('invalid-token-without-signature').valid, false);
   assert.equal(verifySessionToken('').valid, false);
   assert.equal(verifySessionToken(null).valid, false);
@@ -120,4 +129,19 @@ test('Document Parser - File signature verification rules', () => {
   // Zip-based docx/xlsx header (PK\x03\x04)
   const validZipHeader = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
   assert.equal(validZipHeader[0] === 0x50 && validZipHeader[1] === 0x4b && validZipHeader[2] === 0x03 && validZipHeader[3] === 0x04, true);
+});
+
+test('Document Parser - PDFParse runtime execution verification', async () => {
+  const { PDFParse } = require('pdf-parse');
+  const minimalPdf = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 300 144]/Parent 2 0 R/Resources<<>>>>endobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000052 00000 n \n0000000101 00000 n \ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n178\n%%EOF';
+  const buf = Buffer.from(minimalPdf);
+
+  const parser = new PDFParse({ data: buf });
+  const data = await parser.getText();
+  assert.ok(data !== null && typeof data === 'object');
+  assert.equal(typeof data.text, 'string');
+  assert.equal(data.total, 1);
+  if (typeof parser.destroy === 'function') {
+    await parser.destroy();
+  }
 });

@@ -126,11 +126,13 @@ export async function POST(req: Request) {
     // 6. Safe in-memory parsing with format-specific constraints
     if (ext === '.pdf') {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const pdfParse = require('pdf-parse');
-      const data = await pdfParse(buffer, {
-        max: 25, // limit max pages to prevent memory exhaustion
-      });
+      const { PDFParse } = require('pdf-parse');
+      const parser = new PDFParse({ data: buffer });
+      const data = await parser.getText();
       text = data.text || '';
+      if (typeof parser.destroy === 'function') {
+        await parser.destroy();
+      }
     } else if (ext === '.docx') {
       const result = await mammoth.extractRawText({ buffer });
       text = result.value || '';

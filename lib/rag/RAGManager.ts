@@ -59,6 +59,15 @@ export class RAGManager {
       });
     }
 
+    // Chunk 2b: Industry Focus — Logistics & Freight Automation
+    chunks.push({
+      id: 'industry-logistics-freight',
+      source: 'XAIVON Approved Facts',
+      section: 'Industry Focus: Logistics & Freight Automation',
+      text: `### Logistics & Freight Workflow Automation (Primary Industry Focus)\nXAIVON specializes in automated quote intake, load dispatch pipelines, and document processing for freight brokers, 3PLs, and motor carriers. Capabilities include parsing rate confirmations and bills of lading (BOLs), carrier communication pipelines, and connecting dispatch tools with internal accounting systems.`,
+      keywords: ['logistics', 'freight', 'dispatch', 'carrier', 'broker', 'bol', 'loads', 'trucking', 'shipping', 'transport', '3pl', 'workflow']
+    });
+
     // Chunk 3: Integrations & Tech Stack
     chunks.push({
       id: 'supported-integrations',

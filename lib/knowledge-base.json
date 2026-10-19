@@ -22,28 +22,70 @@
   "vision": "AI must operate as foundational, secure business infrastructure—not fragile prototypes or marketing gimmicks.",
   "services": [
     {
-      "category": "Logistics & Supply Chain",
-      "title": "Logistics & Freight Workflow Automation",
-      "description": "Quote request intake, document extraction, and carrier communication pipelines for freight brokers and carriers.",
-      "pricingNote": "Custom-scoped on assessment based on operational volume, document types, and dispatch software integration points."
+      "category": "Workflow & Automation",
+      "title": "Workflow & Business Process Automation",
+      "description": "Connecting tools and data flows to eliminate repetitive manual work and accelerate operational velocity.",
+      "startingTiers": {
+        "Starter": { "USD": "$749", "INR": "₹29,000" },
+        "Plus": { "USD": "$1,249", "INR": "₹49,999" },
+        "Premium": { "USD": "$3,499", "INR": "₹1,49,000" }
+      },
+      "pricingNote": "Starting implementation benchmarks published on xaivon.com/pricing. Final quotes depend on workflow complexity and integration endpoints."
     },
     {
-      "category": "Conversational AI",
-      "title": "AI Chatbots & Inbound Assistants",
-      "description": "Multi-language customer qualification and domain knowledge assistants with verified facts and explicit human handoff.",
-      "pricingNote": "Custom-scoped on assessment based on domain scope, knowledge base size, and CRM integration depth."
+      "category": "AI Agents",
+      "title": "Operational AI Agents & Assistance",
+      "description": "Autonomous agents executing multi-step reasoning, research, data verification, and tool orchestration.",
+      "startingTiers": {
+        "Starter": { "USD": "$2,499", "INR": "₹99,000" },
+        "Plus": { "USD": "$5,499", "INR": "₹2,49,000" },
+        "Premium": { "USD": "$12,000", "INR": "₹5,99,000" }
+      },
+      "pricingNote": "Starting implementation benchmarks published on xaivon.com/pricing. Final quotes tailored based on agent autonomy and tool integrations."
     },
     {
-      "category": "Voice AI Agents",
-      "title": "Autonomous Voice Call Assistance",
+      "category": "Voice AI",
+      "title": "Voice AI & Inbound Telephony Systems",
       "description": "Inbound telephony agents handling common inquiries, qualification, and appointment routing.",
-      "pricingNote": "Custom-scoped on assessment based on anticipated call volume and telephony integration requirements."
+      "startingTiers": {
+        "Starter": { "USD": "$2,999", "INR": "₹1,25,000" },
+        "Plus": { "USD": "$5,499", "INR": "₹1,99,000" },
+        "Premium": { "USD": "$15,000+", "INR": "₹6,99,000" }
+      },
+      "pricingNote": "Starting implementation benchmarks published on xaivon.com/pricing. Telephony provider and minute costs billed separately."
     },
     {
-      "category": "Workflow Automation",
-      "title": "Enterprise Process Automation",
-      "description": "Connecting core tools (CRM, databases, ERPs) to eliminate repetitive manual data entry and speed up transaction cycles.",
-      "pricingNote": "Custom-scoped on assessment based on workflow complexity, system volume, and integration endpoints."
+      "category": "Chatbot & Customer Support",
+      "title": "AI Chatbot & Support Systems",
+      "description": "Multi-lingual customer qualification and domain knowledge assistants with verified facts and explicit human handoff.",
+      "startingTiers": {
+        "Starter": { "USD": "$1,249", "INR": "₹49,000" },
+        "Plus": { "USD": "$2,499", "INR": "₹99,000" },
+        "Premium": { "USD": "$6,000", "INR": "₹2,49,000" }
+      },
+      "pricingNote": "Starting implementation benchmarks published on xaivon.com/pricing. Custom quotes depend on knowledge base size and integration points."
+    },
+    {
+      "category": "CRM, Lead & Data Automation",
+      "title": "CRM, Lead & Data Pipeline Automation",
+      "description": "Structured synchronization across HubSpot, Salesforce, Google Workspace, and internal operational databases.",
+      "startingTiers": {
+        "Starter": { "USD": "$999", "INR": "₹45,000" },
+        "Plus": { "USD": "$2,499", "INR": "₹1,09,000" },
+        "Premium": { "USD": "$6,000", "INR": "₹2,49,000" }
+      },
+      "pricingNote": "Starting implementation benchmarks published on xaivon.com/pricing. Quotes reflect data volume and schema endpoints."
+    },
+    {
+      "category": "Document & Business Process Automation",
+      "title": "Document & Business Process Automation",
+      "description": "Automated document ingestion, data extraction, and verification for freight bills of lading, invoices, and contracts.",
+      "startingTiers": {
+        "Starter": { "USD": "$1,499", "INR": "₹59,000" },
+        "Plus": { "USD": "$2,999", "INR": "₹1,29,000" },
+        "Premium": { "USD": "$7,000", "INR": "₹2,99,000" }
+      },
+      "pricingNote": "Starting implementation benchmarks published on xaivon.com/pricing. Quotes depend on format diversity and processing volume."
     }
   ],
   "integrations": [
@@ -53,24 +95,25 @@
     "Microsoft Teams",
     "Google Workspace",
     "QuickBooks",
-    "Custom REST APIs & Webhooks"
+    "Custom REST APIs & Webhooks",
+    "Logistics TMS & WMS Systems"
   ],
   "faq": [
     {
       "question": "What industries does XAIVON specialize in?",
-      "answer": "XAIVON specializes in logistics, supply chain, and data-heavy operations where repetitive manual tasks create operational bottlenecks."
+      "answer": "XAIVON specializes in logistics, freight operations, supply chain, and data-heavy environments where manual handoffs create operational friction."
     },
     {
       "question": "How does XAIVON pricing work?",
-      "answer": "Because business systems differ significantly, XAIVON prices projects based on architectural scope, system volume, and integration endpoints. Starter solutions generally begin from $499–$1,499, while full enterprise pipelines are scoped via a free operational audit."
+      "answer": "XAIVON publishes transparent starting implementation tiers on xaivon.com/pricing across 6 core service areas (e.g., Workflow Automation starting at $749 USD / ₹29,000 INR; Chatbot Systems starting at $1,249 USD / ₹49,000 INR). Exact commercial quotes are custom-tailored following an operational discovery assessment with founder Raja Babu based on workflow scope, record volume, and integration endpoints."
     },
     {
-      "question": "How long does deployment take?",
-      "answer": "Targeted automations and conversational assistants typically deploy in 1 to 2 weeks. Comprehensive cross-platform pipelines generally require 3 to 6 weeks including rigorous sandbox testing."
+      "question": "How long does implementation take?",
+      "answer": "Focused automations and conversational agents typically deploy in 1 to 2 weeks. Comprehensive multi-system pipelines generally require 3 to 6 weeks including sandbox verification and human review gates."
     },
     {
-      "question": "How can I get started?",
-      "answer": "You can request a free workflow audit or contact Raja directly at raja@xaivon.com (+91-95211-90205) to evaluate your current bottlenecks."
+      "question": "How can I book a discovery consultation?",
+      "answer": "You can connect directly with founder Raja Babu at raja@xaivon.com (+91-95211-90205) or schedule a strategic consultation at https://calendly.com/xaivon."
     }
   ]
 }

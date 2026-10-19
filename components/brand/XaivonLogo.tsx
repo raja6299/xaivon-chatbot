@@ -7,54 +7,46 @@ interface XaivonLogoProps {
 }
 
 /**
- * Official XAIVON Geometric Brand Mark
- * Derived from canonical vector geometry on xaivon.com
- * Rendered in Architectural Warm Copper (#C4704B / #E59873)
+ * Exact Official XAIVON Geometric Brand Mark
+ * Reconstructed 1:1 from xaivon.com visible navbar and footer (.premium-brand-mark):
+ * - 28x28px rounded copper square (#B35734) with 8px corner radius
+ * - 10x10px dark inset square (#24211D) with 2px corner radius at top:6px, left:6px
+ * - 6x6px crisp light square (#FFFFFF) with 1px corner radius at right:6px, bottom:6px
  */
-export function XaivonLogo({ className = "w-8 h-8", size, glow = true }: XaivonLogoProps) {
+export function XaivonLogo({ className = "w-7 h-7", size, glow = false }: XaivonLogoProps) {
   const style = size ? { width: size, height: size } : undefined;
 
   return (
     <svg
-      viewBox="0 0 100 100"
+      viewBox="0 0 28 28"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       style={style}
-      aria-label="XAIVON Logo"
+      aria-label="XAIVON Brand Mark"
       role="img"
     >
       <defs>
-        <linearGradient id="xaivonCopperGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#C4704B" />
-          <stop offset="50%" stopColor="#D4805A" />
-          <stop offset="100%" stopColor="#E59873" />
+        <linearGradient id="xaivonCopperBase" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#C4603B" />
+          <stop offset="100%" stopColor="#B35734" />
         </linearGradient>
         {glow && (
-          <filter id="xaivonCopperGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          <filter id="xaivonMarkGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#B35734" floodOpacity="0.3" />
           </filter>
         )}
       </defs>
 
-      <g filter={glow ? "url(#xaivonCopperGlow)" : undefined}>
-        {/* Main Left-to-Right diagonal bar */}
-        <path d="M20 20 L40 20 L80 80 L60 80 Z" fill="url(#xaivonCopperGrad)" />
+      <g filter={glow ? "url(#xaivonMarkGlow)" : undefined}>
+        {/* Base Copper Rounded Square */}
+        <rect width="28" height="28" rx="8" fill="url(#xaivonCopperBase)" />
 
-        {/* Right-to-Left diagonal upper segment */}
-        <path
-          d="M80 20 L65 20 L45 50 L60 50 Z"
-          fill="url(#xaivonCopperGrad)"
-          opacity="0.95"
-        />
+        {/* Top-Left Dark Inset Square */}
+        <rect x="6" y="6" width="10" height="10" rx="2" fill="#24211D" />
 
-        {/* Right-to-Left diagonal lower segment */}
-        <path
-          d="M40 58 L25 80 L40 80 L55 58 Z"
-          fill="url(#xaivonCopperGrad)"
-          opacity="0.9"
-        />
+        {/* Bottom-Right White Inset Square */}
+        <rect x="16" y="16" width="6" height="6" rx="1" fill="#FFFFFF" />
       </g>
     </svg>
   );

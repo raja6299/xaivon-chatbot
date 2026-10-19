@@ -25,16 +25,28 @@ const SYSTEM_PROMPT = `You are XAIVON’s elite AI Business Consultant and Strat
 - Core Mission: Eliminate operational friction and decouple business growth from headcount. We design, deploy, and maintain connected AI workflow infrastructure and practical AI assistance for logistics companies, carriers, freight brokers, and growing enterprises.
 
 # SOURCE OF TRUTH & FACT ACCURACY (STRICT)
-1. Never invent clients, case studies, false guarantees, ROI percentages, or unverified fixed prices.
-2. If asked about pricing: Explain clearly that all XAIVON engagements are custom-scoped based on workflow discovery, architectural complexity, volume, and integration endpoints. XAIVON does not offer fixed one-size-fits-all package subscriptions. Never fabricate exact dollar figures or quote unverified prices. Always recommend connecting with founder Raja Babu (raja@xaivon.com) or scheduling a discovery session via https://calendly.com/xaivon for an accurate, tailored scope.
+1. Never invent clients, case studies, false guarantees, ROI percentages, or unverified pricing.
+2. If asked about pricing:
+   - Provide the verified published STARTING implementation prices from https://xaivon.com/pricing across our 6 core capabilities:
+     * Workflow & Automation: Starter from $749 USD (₹29,000 INR), Plus from $1,249 USD (₹49,999 INR), Premium from $3,499 USD (₹1,49,000 INR).
+     * AI Agents: Starter from $2,499 USD (₹99,000 INR), Plus from $5,499 USD (₹2,49,000 INR), Premium from $12,000 USD (₹5,99,000 INR).
+     * Voice AI: Starter from $2,999 USD (₹1,25,000 INR), Plus from $5,499 USD (₹1,99,000 INR), Premium from $15,000+ USD (₹6,99,000 INR).
+     * Chatbot & Customer Support: Starter from $1,249 USD (₹49,000 INR), Plus from $2,499 USD (₹99,000 INR), Premium from $6,000 USD (₹2,49,000 INR).
+     * CRM, Lead & Data Automation: Starter from $999 USD (₹45,000 INR), Plus from $2,499 USD (₹1,09,000 INR), Premium from $6,000 USD (₹2,49,000 INR).
+     * Document & Business Process: Starter from $1,499 USD (₹59,000 INR), Plus from $2,999 USD (₹1,29,000 INR), Premium from $7,000 USD (₹2,99,000 INR).
+   - Clarify that these published rates are verified starting benchmarks for defined deliverables.
+   - Explain clearly that the final commercial quote is tailored upon operational discovery based on workflow steps, record/shipment volume, integration depth (TMS, ERP, WMS, CRM), and third-party software/model costs.
+   - Never invent speculative discounts. Always invite the visitor to connect with founder Raja Babu at raja@xaivon.com or schedule via https://calendly.com/xaivon.
 3. If an answer is not established in your context, say: "I don't have that exact operational detail at hand, but Raja and our engineering team can confirm it on a discovery call."
 
 # CORE OFFERINGS
-1. AI Automation & Workflow Orchestration: Connecting tools, parsing documents/rates, and removing manual data entry.
-2. AI Chatbots & Inbound Assistants: Context-aware customer qualification, domain Q&A, and direct human handoff.
-3. AI Voice Agents: Autonomous inbound telephony for routine call handling, qualification, and appointment routing.
-4. Logistics & Freight AI: Automated quote intake, document parsing (BOLs, rate confirmations), and dispatch workflows.
-5. CRM & Data Synchronization: Structured pipelines across HubSpot, Salesforce, Slack, Teams, Google Workspace, and internal databases.
+1. Workflow & Business Process Automation: Multi-app pipelines, conditional logic, and error-handling checkpoints.
+2. AI Chatbots & Inbound Assistants: Context-aware qualification, verified fact retrieval, and human handoff.
+3. Voice AI Agents: Autonomous inbound telephony for routine call handling, qualification, and appointment routing.
+4. Operational AI Agents: Bounded agents executing multi-step reasoning, research, and tool orchestration.
+5. Logistics & Freight AI: Automated quote intake, document parsing (BOLs, rate confirmations), and dispatch workflows.
+6. CRM & Data Synchronization: Structured pipelines across HubSpot, Salesforce, Slack, Teams, Google Workspace, and internal databases.
+7. Document Automation: Intelligent extraction and ERP/TMS data entry from invoices, contracts, and logistics paperwork.
 
 # TONE & STYLE
 - Strategic, authoritative, calm, concise, and business-focused.
@@ -162,8 +174,20 @@ export async function POST(req: Request) {
       );
     }
 
-    const configuredTextModel = process.env.GROQ_CHAT_MODEL || 'llama-3.3-70b-versatile';
-    const modelId = hasImage ? process.env.GROQ_VISION_MODEL! : configuredTextModel;
+    const RETIRED_MODELS = new Set([
+      'llama-3.1-8b-instant',
+      'llama-3.3-70b-versatile',
+      'llama-3.1-70b-versatile',
+      'llama-3.2-11b-vision-preview',
+      'llama-3.2-90b-vision-preview'
+    ]);
+
+    let configuredTextModel = process.env.GROQ_CHAT_MODEL || 'openai/gpt-oss-120b';
+    if (RETIRED_MODELS.has(configuredTextModel)) {
+      console.warn(`[MODEL_MIGRATION] Model '${configuredTextModel}' is decommissioned on Groq Free tiers. Redirecting to 'openai/gpt-oss-120b'.`);
+      configuredTextModel = 'openai/gpt-oss-120b';
+    }
+    const modelId = hasImage ? (process.env.GROQ_VISION_MODEL || configuredTextModel) : configuredTextModel;
 
     // 7. Deterministic RAG Context
     const lastUserMessage = sanitizedMessages.filter(m => m.role === 'user').pop();
@@ -211,11 +235,14 @@ export async function POST(req: Request) {
       try {
         const { createClient } = await import('@supabase/supabase-js');
         const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
-        await supabaseAdmin.from('messages').insert({
+        const { error: userInsertErr } = await supabaseAdmin.from('messages').insert({
           session_id: verifiedSessionId,
           role: 'user',
           content: lastUserText,
         });
+        if (userInsertErr) {
+          logSecurity('UserMessagePersistenceFailed', { code: userInsertErr.code });
+        }
       } catch (persistErr) {
         console.warn('Non-blocking user message persistence warning:', persistErr);
       }
@@ -250,12 +277,15 @@ export async function POST(req: Request) {
           try {
             const { createClient } = await import('@supabase/supabase-js');
             const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
-            await supabaseAdmin.from('messages').insert({
+            const { error: asstInsertErr } = await supabaseAdmin.from('messages').insert({
               session_id: verifiedSessionId,
               role: 'assistant',
               content: text,
               token_usage: usage?.totalTokens || 0,
             });
+            if (asstInsertErr) {
+              logSecurity('AssistantMessagePersistenceFailed', { code: asstInsertErr.code });
+            }
           } catch (persistErr) {
             console.warn('Non-blocking assistant message persistence warning:', persistErr);
           }
@@ -268,7 +298,7 @@ export async function POST(req: Request) {
         const errStr = String(err).toLowerCase();
 
         if (errStr.includes('invalid api key') || errStr.includes('401') || errStr.includes('unauthorized')) {
-          return 'The AI service is currently undergoing maintenance. Please contact Raja directly at raja@xaivon.com for immediate assistance.';
+          return 'The AI service credential requires owner activation. Please reach out directly to founder Raja Babu at raja@xaivon.com (+91-95211-90205) for assistance or strategy scoping.';
         }
         if (errStr.includes('rate limit') || errStr.includes('429')) {
           return 'High inquiry volume. Please wait a moment before sending another message.';

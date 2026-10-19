@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { signSessionId } from '@/lib/security/session';
-import { checkRateLimit, logSecurity } from '@/lib/security';
+import { checkRateLimit, logSecurity, getTrustedClientIp } from '@/lib/security';
 
 export const runtime = 'nodejs';
 
@@ -28,9 +28,8 @@ async function getSupabaseClientSafe() {
 }
 
 export async function POST(req: Request) {
-  // Rate limiting on session creation: 20 per minute
-  const forwarded = req.headers.get('x-forwarded-for');
-  const ip = forwarded?.split(',')[0]?.trim() || 'unknown';
+  // Rate limiting on session creation: 20 per minute using trusted edge IP
+  const ip = getTrustedClientIp(req);
   const rateLimit = checkRateLimit(`sessions_${ip}`, 20, 60_000);
 
   if (!rateLimit.success) {
@@ -46,9 +45,10 @@ export async function POST(req: Request) {
 
   try {
     const supabase = await getSupabaseClientSafe();
+    let persisted = false;
 
     if (supabase) {
-      await supabase
+      const { error } = await supabase
         .from('chat_sessions')
         .insert([
           {
@@ -56,10 +56,17 @@ export async function POST(req: Request) {
             status: 'active',
           },
         ]);
+
+      if (error) {
+        logSecurity('SupabaseSessionInsertError', { code: error.code, message: error.message });
+      } else {
+        persisted = true;
+      }
     }
 
-    return NextResponse.json({ sessionId, sessionToken });
-  } catch {
-    return NextResponse.json({ sessionId, sessionToken });
+    return NextResponse.json({ sessionId, sessionToken, persisted });
+  } catch (err) {
+    logSecurity('SessionCreationException', { error: String(err) });
+    return NextResponse.json({ sessionId, sessionToken, persisted: false });
   }
 }

@@ -15,14 +15,22 @@ test('XAIVON Approved Facts - Core Business Identity', () => {
   assert.ok(XAIVON_APPROVED_FACTS.geographiesServed.includes('United States'));
 });
 
-test('Fact Reconciliation - No stale contradictory pricing', () => {
-  // Ensure all services in approved facts have scope-dependent pricing disclaimers
+test('Fact Reconciliation - All 6 categories and verified starting tiers', () => {
+  assert.equal(XAIVON_APPROVED_FACTS.services.length, 6, 'Must contain all 6 service categories from xaivon.com');
+
+  // Verify all categories and their starting tiers
+  const categories = XAIVON_APPROVED_FACTS.services.map(s => s.category);
+  assert.ok(categories.includes('Workflow & Automation'));
+  assert.ok(categories.includes('AI Agents'));
+  assert.ok(categories.includes('Voice AI'));
+  assert.ok(categories.includes('Chatbot & Customer Support'));
+  assert.ok(categories.includes('CRM, Lead & Data Automation'));
+  assert.ok(categories.includes('Document & Business Process Automation'));
+
   for (const s of XAIVON_APPROVED_FACTS.services) {
-    assert.ok(s.priceGuidance.length > 10, `Service ${s.id} must have clear price guidance`);
-    assert.ok(
-      s.priceGuidance.toLowerCase().includes('scope') || s.priceGuidance.includes('Custom') || s.priceGuidance.includes('discovery'),
-      `Service ${s.id} must note that pricing depends on workflow scope`
-    );
+    assert.ok(s.startingTiers.length >= 3, `Service ${s.id} must have Starter, Plus, and Premium tiers`);
+    assert.ok(s.startingTiers[0].price.USD.startsWith('$'), 'Tier must define USD price');
+    assert.ok(s.startingTiers[0].price.INR.startsWith('₹'), 'Tier must define INR price');
   }
 
   // Ensure knowledgeBase JSON company matches approved facts

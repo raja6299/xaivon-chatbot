@@ -11,10 +11,10 @@ Production-grade conversational AI assistant and consultative discovery platform
 
 ## 1. System Architecture & Features
 
-- **Next.js 16.2.10 (App Router, Turbopack)** with React 19 and `@ai-sdk/groq` (`llama-3.3-70b-versatile`).
+- **Next.js 16.2.10 (App Router, Turbopack)** with React 19 and `@ai-sdk/groq` (`openai/gpt-oss-120b` primary, `openai/gpt-oss-20b` fallback).
 - **Architectural Design System:**
-  - **Light Mode:** Warm Architectural Ivory (`#F8F9FA`), Deep Slate (`#1A1D20`), and Burnished Copper (`#C4704B`).
-  - **Dark Mode:** Deep Architectural Charcoal (`#0B0E14`), Soft Silver Ivory (`#E8ECEF`), and Luminous Warm Copper (`#D4805A`).
+  - **Light Mode:** Warm Architectural Ivory (`#FAF8F5`), Deep Slate (`#1A1D20`), and Burnished Copper (`#B35734`).
+  - **Dark Mode:** Deep Architectural Charcoal (`#121110`), Card Surface (`#1A1816`), and Official Warm Copper (`#B35734`).
 - **Security & Privacy:**
   - Zero autonomous side-effect tools exposed to public LLM streams.
   - Strict SSRF defenses with comprehensive RFC1918, link-local, and AWS/GCP cloud metadata IP filtering (`169.254.169.254`).
@@ -35,9 +35,9 @@ Set these variable **names** in your deployment platform (Vercel) or local `.env
 | Variable Name | Required | Description |
 |---|---|---|
 | `GROQ_API_KEY` | **Yes** | Groq Cloud API key for streaming LLM inference. |
-| `GROQ_CHAT_MODEL` | Optional | Primary chat LLM ID (defaults to `llama-3.3-70b-versatile`). |
+| `GROQ_CHAT_MODEL` | Optional | Primary chat LLM ID (defaults to `openai/gpt-oss-120b`, fallback `openai/gpt-oss-20b`). |
 | `GROQ_VISION_MODEL` | Optional | Vision model ID for document image attachments (disabled if unset). |
-| `SESSION_SECRET` | Optional | Server-side secret for HMAC-SHA256 session tokens. |
+| `SESSION_SECRET` | Required in Prod | Server-side secret (min 32 chars) for HMAC-SHA256 session tokens. Fails closed in production if missing. |
 | `NEXT_PUBLIC_SITE_URL` | Optional | Canonical site base URL (defaults to `https://assistant.xaivon.com`). |
 | `ALLOWED_FRAME_ANCESTORS` | Optional | Additional origins permitted to embed `/embed` via CSP `frame-ancestors`. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Optional | Supabase PostgreSQL project URL for lead and session storage. |
@@ -46,21 +46,23 @@ Set these variable **names** in your deployment platform (Vercel) or local `.env
 
 ---
 
-## 3. Verified Route Inventory (22 Routes)
+## 3. Verified Route Inventory (28 Routes)
 
 All routes verified via Next.js App Router production build:
 
 - **Public Applications:**
   - `/` — Standalone XAIVON AI Business Consultant
   - `/embed` — Isolated iframe embed with strict parent origin validation
+  - `/icon` — Dynamic 32x32 SVG brand mark generator
   - `/login` — Admin login portal
+  - `/robots.txt` & `/sitemap.xml` — Search engine indexing controls
 - **Admin Management & Telemetry (RBAC protected):**
   - `/admin`, `/admin/analytics/ai`, `/admin/analytics/chat`, `/admin/analytics/rag`, `/admin/analytics/voice`, `/admin/calendar`, `/admin/crm`, `/admin/documents`, `/admin/health`, `/admin/integrations`, `/admin/knowledge`, `/admin/logs`, `/admin/pipeline`, `/admin/security`, `/admin/settings`
 - **Hardened API Endpoints:**
-  - `POST /api/chat` — Streaming AI conversation with HMAC session verification
+  - `POST /api/chat` — Streaming AI conversation with HMAC session verification & honest provider error reporting
   - `POST /api/leads` — Enterprise consultation capture with honest HTTP 503 fallback
-  - `POST /api/parse-document` — 5MB bounded document ingestion with file signature checks
-  - `POST /api/sessions` — Cryptographic HMAC-SHA256 session token issuance
+  - `POST /api/parse-document` — 5MB bounded document ingestion with file signature checks & class-based `PDFParse` runtime
+  - `POST /api/sessions` — Cryptographic HMAC-SHA256 session token issuance with timestamp expiry
 
 ---
 
@@ -73,7 +75,7 @@ npm ci
 # 2. Run local development server
 npm run dev
 
-# 3. Run automated test suite (14 tests: RAG, Facts, Security, SSRF, Rate Limiting, HMAC)
+# 3. Run automated test suite (15 tests: RAG, Facts, Security, SSRF, Rate Limiting, HMAC, PDFParse)
 npm test
 
 # 4. Run TypeScript typecheck
@@ -95,11 +97,12 @@ To embed the XAIVON Chatbot inside the marketing website or external platforms, 
 
 ---
 
-## 6. Enterprise V2 Quality Assurance & Release Documentation
+## 6. Enterprise V3 Quality Assurance & Release Documentation
 
-- [`docs/qa/CHATBOT_V2_FINDINGS_AND_FIXES.md`](./docs/qa/CHATBOT_V2_FINDINGS_AND_FIXES.md) — Defect classification and source remediations
-- [`docs/qa/CHATBOT_V2_LIVE_PROVIDER_AND_API_MATRIX.md`](./docs/qa/CHATBOT_V2_LIVE_PROVIDER_AND_API_MATRIX.md) — Groq provider status, model deprecations, and API matrix
-- [`docs/qa/CHATBOT_V2_SECURITY_PRIVACY.md`](./docs/qa/CHATBOT_V2_SECURITY_PRIVACY.md) — HMAC session security, SSRF defenses, PII anonymization, and DoS limits
-- [`docs/qa/CHATBOT_V2_BRANDING_UI_QA.md`](./docs/qa/CHATBOT_V2_BRANDING_UI_QA.md) — Official geometric mark, copper palette, and responsive UI QA
-- [`docs/qa/CHATBOT_V2_BUSINESS_FACTS_AND_SEO.md`](./docs/qa/CHATBOT_V2_BUSINESS_FACTS_AND_SEO.md) — Pricing reconciliation, truthful claims, and SEO directives
-- [`docs/qa/CHATBOT_V2_FINAL_RELEASE_GATE.md`](./docs/qa/CHATBOT_V2_FINAL_RELEASE_GATE.md) — Final release decision, build verification, and rollback guide
+- [`docs/qa/FINAL_PROVIDER_DECISION_AND_FREE_LIMITS.md`](./docs/qa/FINAL_PROVIDER_DECISION_AND_FREE_LIMITS.md) — Groq model verification & token limits
+- [`docs/qa/FINAL_V3_FINDINGS_FIXES_AND_RISKS.md`](./docs/qa/FINAL_V3_FINDINGS_FIXES_AND_RISKS.md) — Root causes, fixes & risk register
+- [`docs/qa/FINAL_V3_SECURITY_SESSION_RATE_LIMIT.md`](./docs/qa/FINAL_V3_SECURITY_SESSION_RATE_LIMIT.md) — Session crypto & rate limiting
+- [`docs/qa/FINAL_V3_BRANDING_PARITY_AND_UI.md`](./docs/qa/FINAL_V3_BRANDING_PARITY_AND_UI.md) — Exact official brand geometry & responsive UI
+- [`docs/qa/FINAL_V3_BUSINESS_PRICING_AND_METADATA.md`](./docs/qa/FINAL_V3_BUSINESS_PRICING_AND_METADATA.md) — 6 category starting pricing parity
+- [`docs/qa/FINAL_V3_REAL_INFERENCE_AND_TEST_MATRIX.md`](./docs/qa/FINAL_V3_REAL_INFERENCE_AND_TEST_MATRIX.md) — Live inference probe & test results
+- [`docs/qa/FINAL_V3_RELEASE_GO_NO_GO.md`](./docs/qa/FINAL_V3_RELEASE_GO_NO_GO.md) — Release scorecard & HOLD decision
