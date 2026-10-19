@@ -80,8 +80,19 @@ export function validateWebhookDestination(urlString: string): URL {
   return url;
 }
 
+const DISALLOWED_HEADERS = new Set([
+  'host',
+  'authorization',
+  'cookie',
+  'set-cookie',
+  'x-forwarded-for',
+  'x-real-ip',
+  'x-vercel-ip',
+  'x-session-token'
+]);
+
 /**
- * Safe, synchronous webhook execution with bounded timeout and redirect protection
+ * Safe, synchronous webhook execution with bounded timeout, header filtering, and redirect protection
  */
 export async function executeWebhook(config: WebhookConfig, payload: Record<string, unknown>) {
   const verifiedUrl = validateWebhookDestination(config.url);
@@ -89,20 +100,27 @@ export async function executeWebhook(config: WebhookConfig, payload: Record<stri
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s max timeout
 
-  const headers: Record<string, string> = {
+  const sanitizedHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
     'User-Agent': 'XAIVON-Integration-Engine/2.0',
-    ...(config.headers || {})
   };
 
+  if (config.headers) {
+    for (const [key, value] of Object.entries(config.headers)) {
+      if (!DISALLOWED_HEADERS.has(key.toLowerCase()) && typeof value === 'string') {
+        sanitizedHeaders[key] = value;
+      }
+    }
+  }
+
   if (config.secret) {
-    headers['X-Xaivon-Signature'] = config.secret;
+    sanitizedHeaders['X-Xaivon-Signature'] = config.secret;
   }
 
   try {
     const response = await fetch(verifiedUrl.toString(), {
       method: config.method,
-      headers,
+      headers: sanitizedHeaders,
       body: config.method !== 'GET' ? JSON.stringify(payload) : undefined,
       signal: controller.signal,
       redirect: 'manual' // Prevent SSRF via open redirects
@@ -118,7 +136,9 @@ export async function executeWebhook(config: WebhookConfig, payload: Record<stri
       throw new Error(`Integration endpoint returned HTTP ${response.status}`);
     }
 
-    const text = await response.text();
+    // Bounded memory reading (max 64KB) to prevent heap exhaustion
+    const rawText = await response.text();
+    const text = rawText.slice(0, 65536);
     try {
       return JSON.parse(text);
     } catch {

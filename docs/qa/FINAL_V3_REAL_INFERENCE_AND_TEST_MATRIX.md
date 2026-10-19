@@ -53,18 +53,35 @@ The automated test suite was executed locally and validated across all security,
 
 | Suite / Command | Execution Command | Result | Pass/Total | Evidence / Exit Code |
 |---|---|---|---|---|
+| **API Handlers & Integration Suite** | `node --test tests/api_handlers_and_integration.test.mjs` | **PASS** | 11 / 11 | Exit 0. Exported handlers: `/api/sessions`, `/api/leads` (503 fallback & honeypot), `/api/parse-document` (413 & PDFParse), `/api/chat` (503 & schema limits), session production expiry, recursive telemetry masking. |
 | **Security & Hardening Suite** | `node --test tests/session_and_security_hardening.test.mjs` | **PASS** | 7 / 7 | Exit 0. Session token expiry, HMAC tampering, production secret enforcement, header IP spoofing, magic bytes, real PDFParse execution. |
 | **Facts, Pricing & RAG Suite** | `node --test tests/rag_and_facts.test.mjs` | **PASS** | 8 / 8 | Exit 0. Pricing parity across 6 categories, USD/INR conversion, logistics RAG retrieval, system prompt pricing injection. |
-| **Combined Test Suite** | `npm test` | **PASS** | 15 / 15 | Exit 0. All 15 tests green in 380ms. |
+| **Combined Test Suite** | `npm test` | **PASS** | 26 / 26 | Exit 0. All 26 tests green with zero errors. |
 | **TypeScript Static Check** | `npx tsc --noEmit` | **PASS** | 0 errors | Exit 0. Complete type safety across all components and server routes. |
 | **ESLint Validation** | `npm run lint` | **PASS** | 0 errors, 0 warnings | Exit 0. Clean linting with zero unused directives or warnings. |
-| **Next.js Production Build** | `npm run build` | **PASS** | 28 / 28 routes | Exit 0. Turbopack compilation in 17.2s. 28 static/dynamic routes generated. |
+| **Next.js Production Build** | `npm run build` | **PASS** | 28 / 28 routes | Exit 0. Turbopack compilation in 23.1s. 28 static/dynamic routes generated. |
 
 ---
 
 ## 3. Detailed Test Assertions
 
-### Suite 1: `tests/session_and_security_hardening.test.mjs`
+### Suite 1: `tests/api_handlers_and_integration.test.mjs`
+```text
+✔ API Handler: /api/sessions mints cryptographically valid 3-part token (30.29ms)
+✔ API Handler: /api/sessions enforces rate limits (21.91ms)
+✔ API Handler: /api/leads returns honest 503 with mailto fallback when DB unconfigured (29.31ms)
+✔ API Handler: /api/leads honeypot silently succeeds without DB write (6.14ms)
+✔ API Handler: /api/leads rejects invalid international phone format (5.14ms)
+✔ API Handler: /api/parse-document rejects oversized Content-Length early (2.94ms)
+✔ API Handler: /api/parse-document PDFParse execution verification (2082.64ms)
+✔ API Handler: /api/chat schema rejects empty messages or oversized message text (5.55ms)
+✔ API Handler: /api/chat returns honest 503 when GROQ_API_KEY is not configured (5.32ms)
+✔ Session Security: Production rejects legacy 2-part tokens without timestamp expiry (1.73ms)
+✔ Telemetry: sanitizeLogData recursively masks secrets, keys, and PII (1.09ms)
+ℹ tests 11 | pass 11 | fail 0
+```
+
+### Suite 2: `tests/session_and_security_hardening.test.mjs`
 ```text
 ✔ Session Security - Fail closed in production without SESSION_SECRET (4.13ms)
 ✔ Session Security - Token creation and verification with timestamp expiry (1.82ms)
@@ -76,7 +93,7 @@ The automated test suite was executed locally and validated across all security,
 ℹ tests 7 | pass 7 | fail 0 | cancelled 0 | skipped 0 | todo 0
 ```
 
-### Suite 2: `tests/rag_and_facts.test.mjs`
+### Suite 3: `tests/rag_and_facts.test.mjs`
 ```text
 ✔ Knowledge Base - XAIVON_OFFICIAL_PRICING contains all 6 verified categories (1.24ms)
 ✔ Knowledge Base - Workflow & Automation tiers match official website pricing (0.56ms)

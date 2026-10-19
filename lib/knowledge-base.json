@@ -109,7 +109,7 @@
     },
     {
       "question": "How long does implementation take?",
-      "answer": "Focused automations and conversational agents typically deploy in 1 to 2 weeks. Comprehensive multi-system pipelines generally require 3 to 6 weeks including sandbox verification and human review gates."
+      "answer": "Implementation timelines depend on workflow complexity and integration scope; initial prototypes and pilots are typically phased following discovery and sandbox verification checkpoints."
     },
     {
       "question": "How can I book a discovery consultation?",

@@ -4,7 +4,7 @@ import * as xlsx from 'xlsx';
 import { checkRateLimit, getTrustedClientIp } from '@/lib/security';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB hard limit
-const MAX_CHARS = 50000; // 50k character output limit
+const MAX_CHARS = 12000; // 12k character bounded output limit
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.docx', '.xlsx', '.xls', '.csv', '.txt']);
 
 /**
@@ -128,10 +128,13 @@ export async function POST(req: Request) {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { PDFParse } = require('pdf-parse');
       const parser = new PDFParse({ data: buffer });
-      const data = await parser.getText();
-      text = data.text || '';
-      if (typeof parser.destroy === 'function') {
-        await parser.destroy();
+      try {
+        const data = await parser.getText();
+        text = data.text || '';
+      } finally {
+        if (typeof parser.destroy === 'function') {
+          await parser.destroy();
+        }
       }
     } else if (ext === '.docx') {
       const result = await mammoth.extractRawText({ buffer });
@@ -158,10 +161,9 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ text: text.trim() });
-  } catch (error: unknown) {
+  } catch {
     // Redact error details to prevent leaking file contents or stack trace PII
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Document parse failed safely:', { reason: errorMessage });
+    console.error('Document parse failed safely:', { reason: 'PARSING_FAILED' });
     return NextResponse.json(
       { error: 'Failed to process document. Please ensure the file is valid and unencrypted.' },
       { status: 500 }

@@ -63,7 +63,7 @@ export default function Home() {
               Decouple business growth from operational headcount.
             </h1>
             <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-              XAIVON designs and deploys connected AI systems that eliminate manual data entry, accelerate transaction velocity, and automate complex workflows.
+              XAIVON designs and deploys connected AI systems to streamline data workflows, accelerate operational velocity, and automate repetitive tasks.
             </p>
           </div>
 
@@ -103,7 +103,7 @@ export default function Home() {
         </section>
 
         {/* Right Column: Embedded Interactive Chat Window */}
-        <section className="lg:col-span-7 w-full h-[580px] sm:h-[620px] lg:h-[min(680px,calc(100vh-140px))] min-h-[500px] rounded-2xl shadow-2xl border border-[var(--border-subtle)] overflow-hidden bg-[var(--bg-panel)] relative">
+        <section className="lg:col-span-7 w-full h-[540px] sm:h-[600px] lg:h-[min(680px,calc(100dvh-130px))] min-h-[400px] rounded-2xl shadow-2xl border border-[var(--border-subtle)] overflow-hidden bg-[var(--bg-panel)] relative">
           <ChatWindow isEmbed={false} />
         </section>
       </div>

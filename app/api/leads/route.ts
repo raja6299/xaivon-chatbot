@@ -122,21 +122,24 @@ export async function POST(req: Request) {
 
     // 5. Duplicate Lead Detection (Safe PostgREST query on clean email)
     try {
-      const { data: existingLead } = await supabase
+      const { data: existingLead, error: dupCheckErr } = await supabase
         .from('enterprise_leads')
         .select('id')
         .eq('email', cleanEmail)
         .limit(1);
 
-      if (existingLead && existingLead.length > 0) {
+      if (dupCheckErr) {
+        logSecurity('DuplicateCheckFailed', { code: dupCheckErr.code });
+      } else if (existingLead && existingLead.length > 0) {
         logAnalytics('DuplicateLeadPrevented', { maskedEmail: maskEmail(cleanEmail) });
         return NextResponse.json({
           success: true,
-          note: "You're already in touch with our team. We will reach out to you shortly."
+          status: 'already_registered',
+          note: "An inquiry for this contact is already recorded. Our team will contact you directly."
         });
       }
-    } catch (dbError) {
-      logSecurity('SupabaseError', { action: 'DuplicateCheck', error: String(dbError) });
+    } catch {
+      logSecurity('SupabaseError', { action: 'DuplicateCheck', code: 'EXCEPTION' });
     }
 
     // 6. Insert Lead (Matches schema)
@@ -158,7 +161,8 @@ export async function POST(req: Request) {
       if (error.code === '23505') {
         return NextResponse.json({
           success: true,
-          note: 'Lead already registered for this session.'
+          status: 'already_registered',
+          note: 'An inquiry for this contact is already recorded.'
         });
       }
 
@@ -181,8 +185,8 @@ export async function POST(req: Request) {
       note: 'Inquiry successfully registered. We will be in touch shortly.'
     });
 
-  } catch (error) {
-    logSecurity('ServerError', { endpoint: '/api/leads', error: String(error) });
+  } catch {
+    logSecurity('ServerError', { endpoint: '/api/leads', code: 'LEAD_INTERNAL_EXCEPTION' });
     return NextResponse.json(
       { error: 'An unexpected error occurred. Please contact raja@xaivon.com directly.' },
       { status: 500 }

@@ -83,8 +83,13 @@ export function verifySessionToken(token: string | null | undefined): {
     }
   }
 
-  // Backward compatibility migration path for legacy 2-part tokens: <sessionId>.<16-char-hmac>
+  // Migration path for legacy 2-part tokens: <sessionId>.<16-char-hmac>
+  // Strictly rejected in production to prevent replay attacks without expiry timestamps
   if (parts.length === 2) {
+    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_LEGACY_TOKENS !== 'true') {
+      return { valid: false, reason: 'legacy_tokens_deprecated_in_production' };
+    }
+
     const [sessionId, providedHmac] = parts;
     if (!sessionId || !providedHmac || (providedHmac.length !== 16 && providedHmac.length !== 64)) {
       return { valid: false, reason: 'malformed_legacy_token' };
@@ -104,6 +109,7 @@ export function verifySessionToken(token: string | null | undefined): {
       );
 
       if (isMatch) {
+        console.warn('[SECURITY] Legacy 2-part session token detected. Client must re-authenticate for timestamped 3-part token.');
         return { valid: true, sessionId };
       }
     } catch {

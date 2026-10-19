@@ -58,15 +58,31 @@ export async function POST(req: Request) {
         ]);
 
       if (error) {
-        logSecurity('SupabaseSessionInsertError', { code: error.code, message: error.message });
+        logSecurity('SupabaseSessionInsertError', { code: error.code || 'DB_INSERT_FAILED' });
+        if (process.env.REQUIRE_PERSISTENCE === 'true') {
+          return NextResponse.json(
+            { error: 'Persistent session storage unavailable. Please try again later.' },
+            { status: 503 }
+          );
+        }
       } else {
         persisted = true;
       }
     }
 
-    return NextResponse.json({ sessionId, sessionToken, persisted });
-  } catch (err) {
-    logSecurity('SessionCreationException', { error: String(err) });
-    return NextResponse.json({ sessionId, sessionToken, persisted: false });
+    return NextResponse.json({
+      sessionId,
+      sessionToken,
+      persisted,
+      mode: persisted ? 'persistent' : 'stateless_in_memory'
+    });
+  } catch {
+    logSecurity('SessionCreationException', { code: 'INTERNAL_EXCEPTION' });
+    return NextResponse.json({
+      sessionId,
+      sessionToken,
+      persisted: false,
+      mode: 'stateless_in_memory'
+    });
   }
 }

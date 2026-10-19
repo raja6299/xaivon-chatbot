@@ -42,7 +42,7 @@ const SYSTEM_PROMPT = `You are XAIVON’s elite AI Business Consultant and Strat
 # CORE OFFERINGS
 1. Workflow & Business Process Automation: Multi-app pipelines, conditional logic, and error-handling checkpoints.
 2. AI Chatbots & Inbound Assistants: Context-aware qualification, verified fact retrieval, and human handoff.
-3. Voice AI Agents: Autonomous inbound telephony for routine call handling, qualification, and appointment routing.
+3. Voice AI Agents: Structured inbound telephony assistance for routine call triage, qualification, and appointment routing with human escalation.
 4. Operational AI Agents: Bounded agents executing multi-step reasoning, research, and tool orchestration.
 5. Logistics & Freight AI: Automated quote intake, document parsing (BOLs, rate confirmations), and dispatch workflows.
 6. CRM & Data Synchronization: Structured pipelines across HubSpot, Salesforce, Slack, Teams, Google Workspace, and internal databases.
@@ -98,7 +98,16 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. Parse and Validate Request Body
+    // 3. Parse and Validate Request Body with size boundary
+    const contentLength = req.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > 100 * 1024) {
+      logSecurity('PayloadTooLarge', { ip, requestId });
+      return new Response(
+        JSON.stringify({ error: 'Payload exceeds maximum allowed size (100KB).' }),
+        { status: 413, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     let body;
     try {
       body = await req.json();
@@ -250,27 +259,25 @@ export async function POST(req: Request) {
 
     const startTime = Date.now();
 
-    // 10. AI Streaming Response (Pure conversational intelligence — unsafe tool side-effects removed)
+    // 10. AI Streaming Response (Pure conversational intelligence — bounded output tokens)
     const response = await streamText({
       model: groq(modelId),
       system: finalSystemPrompt,
       messages: contextSafeMessages,
       temperature: 0.6,
+      maxOutputTokens: 750,
       onError: (err: unknown) => {
         const latency = Date.now() - startTime;
         let statusCode = 'UNKNOWN';
-        let errorMessage = 'Streaming error';
 
         if (err && typeof err === 'object') {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const e = err as Record<string, any>;
           if (e.statusCode || e.status) statusCode = String(e.statusCode || e.status);
-          if (e.data?.error?.message) errorMessage = e.data.error.message;
-          else if (e.message) errorMessage = e.message;
         }
 
-        console.error(`[STREAM_ERROR] RequestId: ${requestId} | Code: ${statusCode} | Latency: ${latency}ms | Error: ${errorMessage}`);
-        logSecurity('StreamError', { requestId, statusCode, error: errorMessage, latencyMs: latency });
+        console.error(`[STREAM_ERROR] RequestId: ${requestId} | Code: ${statusCode} | Latency: ${latency}ms`);
+        logSecurity('StreamError', { requestId, statusCode, latencyMs: latency });
       },
       onFinish: async ({ text, usage }) => {
         if (verifiedSessionId && isRealSupabase) {
@@ -316,7 +323,7 @@ export async function POST(req: Request) {
 
   } catch (error) {
     const errorString = String(error).toLowerCase();
-    logSecurity('ServerError', { requestId, error: String(error) });
+    logSecurity('ServerError', { requestId, code: 'CHAT_ROUTE_EXCEPTION' });
 
     if (errorString.includes('invalid api key') || errorString.includes('401')) {
       return new Response(

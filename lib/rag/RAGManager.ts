@@ -82,8 +82,8 @@ export class RAGManager {
       id: 'implementation-process',
       source: 'XAIVON Approved Facts',
       section: 'Delivery & Deployment Process',
-      text: `XAIVON Implementation Methodology:\n${XAIVON_APPROVED_FACTS.implementationProcess.join('\n')}\nTimeline: Starter automations deploy in 1–2 weeks; enterprise multi-agent workflows typically 3–6 weeks.`,
-      keywords: ['timeline', 'process', 'how long', 'weeks', 'deploy', 'implementation', 'steps', 'audit', 'discovery']
+      text: `XAIVON Implementation Methodology:\n${XAIVON_APPROVED_FACTS.implementationProcess.join('\n')}\nTimeline: Scoping and timelines are tailored upon discovery; initial prototypes and pilots are phased over several weeks depending on system integrations and validation checkpoints.`,
+      keywords: ['timeline', 'process', 'how long', 'weeks', 'deploy', 'implementation', 'steps', 'audit', 'discovery', 'pilot']
     });
 
     // Chunk 5: FAQ & Policies

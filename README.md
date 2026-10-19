@@ -75,7 +75,7 @@ npm ci
 # 2. Run local development server
 npm run dev
 
-# 3. Run automated test suite (15 tests: RAG, Facts, Security, SSRF, Rate Limiting, HMAC, PDFParse)
+# 3. Run automated test suite (26 tests: API Handlers, RAG, Facts, Security, SSRF, Rate Limiting, HMAC, PDFParse)
 npm test
 
 # 4. Run TypeScript typecheck
