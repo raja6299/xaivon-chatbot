@@ -25,25 +25,25 @@
       "category": "Logistics & Supply Chain",
       "title": "Logistics & Freight Workflow Automation",
       "description": "Quote request intake, document extraction, and carrier communication pipelines for freight brokers and carriers.",
-      "pricingNote": "Custom scoped based on operational volume and TMS/system endpoints. Foundational systems typically begin at $1,499+."
+      "pricingNote": "Custom-scoped on assessment based on operational volume, document types, and dispatch software integration points."
     },
     {
       "category": "Conversational AI",
       "title": "AI Chatbots & Inbound Assistants",
       "description": "Multi-language customer qualification and domain knowledge assistants with verified facts and explicit human handoff.",
-      "pricingNote": "Tailored to workflow scope. Typical website implementations begin from $499–$1,299+."
+      "pricingNote": "Custom-scoped on assessment based on domain scope, knowledge base size, and CRM integration depth."
     },
     {
       "category": "Voice AI Agents",
       "title": "Autonomous Voice Call Assistance",
       "description": "Inbound telephony agents handling common inquiries, qualification, and appointment routing.",
-      "pricingNote": "Custom quoted based on expected call volume and telephony integration."
+      "pricingNote": "Custom-scoped on assessment based on anticipated call volume and telephony integration requirements."
     },
     {
       "category": "Workflow Automation",
       "title": "Enterprise Process Automation",
       "description": "Connecting core tools (CRM, databases, ERPs) to eliminate repetitive manual data entry and speed up transaction cycles.",
-      "pricingNote": "Scoped per workflow complexity ($799–$1,999+ starter; custom enterprise builds quoted upon audit)."
+      "pricingNote": "Custom-scoped on assessment based on workflow complexity, system volume, and integration endpoints."
     }
   ],
   "integrations": [

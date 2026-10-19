@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Play, Pause, Square, X, Volume2 } from 'lucide-react';
 import { getVoiceManager } from '../../lib/voice/VoiceManager';
+import { XaivonLogo } from '../brand/XaivonLogo';
 
 export interface ChatMessageProps {
   role: 'user' | 'assistant';
@@ -135,11 +136,10 @@ export const ChatMessage = memo(function ChatMessage({
       {/* Bot badge */}
       {!isUser && (
         <div
-          className="w-7 h-7 rounded-lg bg-[var(--copper-primary)] flex items-center justify-center text-white text-[11px] font-bold shrink-0 mt-0.5 shadow-sm"
-          style={{ fontFamily: 'var(--font-heading)' }}
+          className="w-7 h-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center p-1 shrink-0 mt-0.5 shadow-sm"
           aria-hidden="true"
         >
-          X
+          <XaivonLogo className="w-full h-full" glow={false} />
         </div>
       )}
 

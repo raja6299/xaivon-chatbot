@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 
 import { isValidPhoneNumber } from 'libphonenumber-js';
-import { checkRateLimit, sanitizeInput, leadRequestSchema, logAnalytics, logSecurity, maskEmail } from '@/lib/security';
+import { checkRateLimit, sanitizeInput, leadRequestSchema, logAnalytics, logSecurity, maskEmail, getTrustedClientIp } from '@/lib/security';
+import { verifySessionToken } from '@/lib/security/session';
 
 /**
  * Attempts to get a Supabase client. Returns null if env vars are missing or placeholder.
@@ -33,8 +34,7 @@ async function getSupabaseClientSafe() {
 export async function POST(req: Request) {
   try {
     // 1. Rate Limiting (5 requests per minute per IP sliding window)
-    const forwarded = req.headers.get('x-forwarded-for');
-    const ip = forwarded?.split(',')[0]?.trim() || 'unknown';
+    const ip = getTrustedClientIp(req);
 
     const rateLimit = checkRateLimit(`leads_${ip}`, 5, 60_000);
     if (!rateLimit.success) {
@@ -81,7 +81,11 @@ export async function POST(req: Request) {
     const email = sanitizeInput(body.email);
     const company = sanitizeInput(body.company);
     const phone = body.phone ? sanitizeInput(body.phone) : '';
-    const sessionId = body.sessionId ? sanitizeInput(body.sessionId) : '';
+
+    // Verify session token
+    const rawSessionToken = req.headers.get('x-session-token') || body.sessionToken || req.headers.get('x-session-id') || body.sessionId;
+    const sessionCheck = verifySessionToken(rawSessionToken);
+    const verifiedSessionId = sessionCheck.valid ? sessionCheck.sessionId : null;
 
     const cleanEmail = email.toLowerCase().trim();
 
@@ -101,16 +105,19 @@ export async function POST(req: Request) {
     const supabase = await getSupabaseClientSafe();
 
     if (!supabase) {
-      // In development or when Supabase is unconfigured, succeed gracefully without leaking internals
-      logAnalytics('LeadCapturedOffline', {
+      logAnalytics('LeadCaptureServiceUnavailable', {
         companyLength: company.length,
         hasPhone: !!cleanPhone,
         timestamp: new Date().toISOString()
       });
-      return NextResponse.json({
-        success: true,
-        note: 'Thank you! Your inquiry has been received. Our team will contact you shortly.'
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Lead registration service is currently offline or awaiting configuration. Please contact Raja Babu directly at raja@xaivon.com (+91-95211-90205) or book a discovery call at https://calendly.com/xaivon.',
+          fallbackMailto: `mailto:raja@xaivon.com?subject=${encodeURIComponent(`Consultation Inquiry from ${fullName} (${company})`)}&body=${encodeURIComponent(`Name: ${fullName}\nCompany: ${company}\nEmail: ${cleanEmail}\nPhone: ${cleanPhone || 'N/A'}\n`)}`
+        },
+        { status: 503 }
+      );
     }
 
     // 5. Duplicate Lead Detection (Safe PostgREST query on clean email)
@@ -138,7 +145,7 @@ export async function POST(req: Request) {
       email: cleanEmail,
       company: company,
       phone: cleanPhone,
-      session_id: sessionId || null,
+      session_id: verifiedSessionId || null,
       pipeline_stage: 'new',
     };
 

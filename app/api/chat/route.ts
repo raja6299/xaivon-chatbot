@@ -1,6 +1,7 @@
 import { groq } from '@ai-sdk/groq';
 import { streamText, convertToModelMessages, safeValidateUIMessages, pruneMessages } from 'ai';
-import { checkRateLimit, sanitizeInput, chatRequestSchema, logAnalytics, logSecurity } from '@/lib/security';
+import { checkRateLimit, sanitizeInput, chatRequestSchema, logAnalytics, logSecurity, getTrustedClientIp } from '@/lib/security';
+import { verifySessionToken } from '@/lib/security/session';
 import { RAGManager } from '@/lib/rag/RAGManager';
 import { XAIVON_APPROVED_FACTS } from '@/lib/knowledge/XAIVON_APPROVED_FACTS';
 
@@ -25,7 +26,7 @@ const SYSTEM_PROMPT = `You are XAIVON’s elite AI Business Consultant and Strat
 
 # SOURCE OF TRUTH & FACT ACCURACY (STRICT)
 1. Never invent clients, case studies, false guarantees, ROI percentages, or unverified fixed prices.
-2. If asked about pricing: Explain that XAIVON projects are custom-scoped based on architectural complexity, data volume, and integration endpoints. As general guidance, foundational assistants or targeted automations typically begin from $499 to $1,499+, while enterprise multi-agent workflows are quoted upon discovery.
+2. If asked about pricing: Explain clearly that all XAIVON engagements are custom-scoped based on workflow discovery, architectural complexity, volume, and integration endpoints. XAIVON does not offer fixed one-size-fits-all package subscriptions. Never fabricate exact dollar figures or quote unverified prices. Always recommend connecting with founder Raja Babu (raja@xaivon.com) or scheduling a discovery session via https://calendly.com/xaivon for an accurate, tailored scope.
 3. If an answer is not established in your context, say: "I don't have that exact operational detail at hand, but Raja and our engineering team can confirm it on a discovery call."
 
 # CORE OFFERINGS
@@ -52,11 +53,9 @@ export async function POST(req: Request) {
   const requestId = `XAIVON-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
   try {
-    // 1. Rate Limiting (10 RPM per IP/Session sliding window)
-    const forwarded = req.headers.get('x-forwarded-for');
-    const sessionIdHeader = req.headers.get('x-session-id');
-    const ip = forwarded?.split(',')[0]?.trim() || sessionIdHeader || 'unknown';
-    const rateLimit = checkRateLimit(`chat_${ip}`, 10, 60_000);
+    // 1. Rate Limiting (15 RPM per IP sliding window using trusted IP)
+    const ip = getTrustedClientIp(req);
+    const rateLimit = checkRateLimit(`chat_${ip}`, 15, 60_000);
 
     if (!rateLimit.success) {
       logSecurity('RateLimitExceeded', { ip, endpoint: '/api/chat' });
@@ -77,11 +76,11 @@ export async function POST(req: Request) {
 
     // 2. Validate Groq Provider Availability
     const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey || apiKey === 'invalid_key' || apiKey.trim() === '') {
+    if (!apiKey || apiKey === 'invalid_key' || apiKey.includes('invalid_test') || apiKey.trim() === '') {
       logSecurity('MissingProviderKey', { service: 'Groq', requestId });
       return new Response(
         JSON.stringify({
-          error: 'AI Consultant service is currently undergoing scheduled maintenance. Please contact Raja Babu directly at raja@xaivon.com (+91-95211-90205).'
+          error: 'The XAIVON AI consultant service is currently awaiting provider credential activation. Please contact Raja Babu directly at raja@xaivon.com (+91-95211-90205) or schedule a consultation at https://calendly.com/xaivon.'
         }),
         { status: 503, headers: { 'Content-Type': 'application/json' } }
       );
@@ -108,7 +107,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { messages: rawMessages, sessionId: bodySessionId } = validationResult.data;
+    const { messages: rawMessages, sessionId: bodySessionId, sessionToken: bodySessionToken } = validationResult.data;
     const uiMessagesValidation = await safeValidateUIMessages({ messages: rawMessages });
 
     if (!uiMessagesValidation.success) {
@@ -120,7 +119,11 @@ export async function POST(req: Request) {
     }
 
     const messages = uiMessagesValidation.data;
-    const sessionId = req.headers.get('x-session-id') || bodySessionId;
+
+    // Session token validation: requires cryptographic HMAC proof to prevent cross-session injection
+    const rawToken = req.headers.get('x-session-token') || bodySessionToken || req.headers.get('x-session-id') || bodySessionId;
+    const sessionCheck = verifySessionToken(rawToken);
+    const verifiedSessionId = sessionCheck.valid ? sessionCheck.sessionId : null;
 
     // 4. Sanitize Input Text
     const sanitizedMessages = messages.map(m => {
@@ -143,13 +146,24 @@ export async function POST(req: Request) {
       requestId
     });
 
-    // 6. Model Selection
+    // 6. Model Selection (Environment-configurable with active supported model)
     const hasImage = sanitizedMessages.some((m: unknown) => {
       const msg = m as { experimental_attachments?: Array<{ contentType?: string }> };
       return msg.experimental_attachments && msg.experimental_attachments.some(a => a.contentType?.startsWith('image/'));
     });
-    // Use supported, high-performance Groq models
-    const modelId = hasImage ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
+
+    // Vision model safeguard: llama-3.2-11b-vision-preview was decommissioned on Groq
+    if (hasImage && !process.env.GROQ_VISION_MODEL) {
+      return new Response(
+        JSON.stringify({
+          error: 'Direct image vision analysis is currently disabled. Please describe your operational workflow or upload PDF/DOCX/CSV documents.'
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const configuredTextModel = process.env.GROQ_CHAT_MODEL || 'llama-3.3-70b-versatile';
+    const modelId = hasImage ? process.env.GROQ_VISION_MODEL! : configuredTextModel;
 
     // 7. Deterministic RAG Context
     const lastUserMessage = sanitizedMessages.filter(m => m.role === 'user').pop();
@@ -188,17 +202,17 @@ export async function POST(req: Request) {
       toolCalls: [{ type: 'before-last-message' }]
     });
 
-    // 9. Safe Supabase Persistence (Only if valid database configured)
+    // 9. Safe Supabase Persistence (Only when session token is cryptographically verified)
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const isRealSupabase = supabaseUrl && supabaseKey && !supabaseUrl.includes('dummy') && !supabaseUrl.includes('your_supabase');
 
-    if (sessionId && isRealSupabase && lastUserMessage) {
+    if (verifiedSessionId && isRealSupabase && lastUserMessage) {
       try {
         const { createClient } = await import('@supabase/supabase-js');
         const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
         await supabaseAdmin.from('messages').insert({
-          session_id: sessionId,
+          session_id: verifiedSessionId,
           role: 'user',
           content: lastUserText,
         });
@@ -232,12 +246,12 @@ export async function POST(req: Request) {
         logSecurity('StreamError', { requestId, statusCode, error: errorMessage, latencyMs: latency });
       },
       onFinish: async ({ text, usage }) => {
-        if (sessionId && isRealSupabase) {
+        if (verifiedSessionId && isRealSupabase) {
           try {
             const { createClient } = await import('@supabase/supabase-js');
             const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
             await supabaseAdmin.from('messages').insert({
-              session_id: sessionId,
+              session_id: verifiedSessionId,
               role: 'assistant',
               content: text,
               token_usage: usage?.totalTokens || 0,

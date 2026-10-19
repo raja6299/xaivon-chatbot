@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage, type TextUIPart } from 'ai';
 import { ChatMessage } from './ChatMessage';
+import { XaivonLogo } from '../brand/XaivonLogo';
 import { LeadFormModal } from './LeadFormModal';
 import { CalendarModal } from './CalendarModal';
 import dynamic from 'next/dynamic';
@@ -66,10 +67,12 @@ function getContextualSuggestions(messages: UIMessage[]): { icon: string; text: 
 interface ChatWindowProps {
   onClose?: () => void;
   isEmbed?: boolean;
+  initialPrompt?: string;
 }
 
-export function ChatWindow({ onClose, isEmbed = false }: ChatWindowProps) {
+export function ChatWindow({ onClose, isEmbed = false, initialPrompt }: ChatWindowProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') {
       return (document.documentElement.getAttribute('data-theme') as 'dark' | 'light') || 'dark';
@@ -92,11 +95,25 @@ export function ChatWindow({ onClose, isEmbed = false }: ChatWindowProps) {
     id: 'xaivon-persistent-chat',
     transport: new DefaultChatTransport({
       api: '/api/chat',
-      headers: sessionId ? { 'x-session-id': sessionId } : undefined,
       fetch: async (url, options) => {
-        if (options?.body) {
+        const token = sessionToken || (typeof window !== 'undefined' ? localStorage.getItem('xaivon_chat_session_token') : null);
+        const sId = sessionId || (typeof window !== 'undefined' ? localStorage.getItem('xaivon_chat_session_id') : null);
+
+        const finalOptions = {
+          ...options,
+          headers: {
+            ...(options?.headers || {}),
+            ...(token ? { 'x-session-token': token } : {}),
+            ...(sId ? { 'x-session-id': sId } : {}),
+          }
+        };
+
+        if (finalOptions?.body) {
           try {
-            const parsed = JSON.parse(options.body as string);
+            const parsed = JSON.parse(finalOptions.body as string);
+            if (token) parsed.sessionToken = token;
+            if (sId) parsed.sessionId = sId;
+
             if (parsed.messages && Array.isArray(parsed.messages)) {
               const MAX_WINDOW = CHAT_HISTORY_WINDOW;
               const msgs = parsed.messages;
@@ -113,19 +130,19 @@ export function ChatWindow({ onClose, isEmbed = false }: ChatWindowProps) {
                   startIndex--;
                 }
                 parsed.messages = msgs.slice(startIndex);
-                options.body = JSON.stringify(parsed);
               }
             }
+            finalOptions.body = JSON.stringify(parsed);
           } catch (e) {
             console.error("Payload intercept failed", e);
           }
         }
-        return fetch(url, options);
+        return fetch(url, finalOptions);
       }
     }),
   });
 
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(() => initialPrompt?.trim() || '');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -134,6 +151,24 @@ export function ChatWindow({ onClose, isEmbed = false }: ChatWindowProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const { t, language, setLanguage } = useTranslation();
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handlePromptEvent = (e: any) => {
+      const prompt = e?.detail;
+      if (typeof prompt === 'string' && prompt.trim()) {
+        setInput(prompt.trim());
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }
+    };
+
+    window.addEventListener('xaivon:set-prompt', handlePromptEvent);
+    return () => {
+      window.removeEventListener('xaivon:set-prompt', handlePromptEvent);
+    };
+  }, []);
 
   // File Management
   const { files, isProcessing, addFiles, removeFile, clearFiles, retryFile } = useFiles();
@@ -202,8 +237,10 @@ export function ChatWindow({ onClose, isEmbed = false }: ChatWindowProps) {
 
     const initSession = async () => {
       const storedSession = localStorage.getItem('xaivon_chat_session_id');
-      if (storedSession) {
+      const storedToken = localStorage.getItem('xaivon_chat_session_token');
+      if (storedSession && storedToken) {
         setSessionId(storedSession);
+        setSessionToken(storedToken);
         return;
       }
 
@@ -213,6 +250,10 @@ export function ChatWindow({ onClose, isEmbed = false }: ChatWindowProps) {
         if (data.sessionId) {
           setSessionId(data.sessionId);
           localStorage.setItem('xaivon_chat_session_id', data.sessionId);
+        }
+        if (data.sessionToken) {
+          setSessionToken(data.sessionToken);
+          localStorage.setItem('xaivon_chat_session_token', data.sessionToken);
         }
       } catch {
         // Session creation is non-blocking
@@ -324,10 +365,14 @@ export function ChatWindow({ onClose, isEmbed = false }: ChatWindowProps) {
     company: string;
     phone: string;
   }) => {
+    const token = sessionToken || (typeof window !== 'undefined' ? localStorage.getItem('xaivon_chat_session_token') : null);
     const response = await fetch('/api/leads', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...formData, sessionId }),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'x-session-token': token } : {}),
+      },
+      body: JSON.stringify({ ...formData, sessionId, sessionToken: token }),
     });
     const data = await response.json();
     if (!response.ok || !data.success) {
@@ -408,11 +453,8 @@ export function ChatWindow({ onClose, isEmbed = false }: ChatWindowProps) {
       <div className="shrink-0 px-4 py-3 border-b border-[var(--border-glass)] bg-[var(--bg-panel)]/90 backdrop-blur-md z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div
-              className="w-8 h-8 rounded-xl bg-[var(--copper-primary)] flex items-center justify-center text-white text-xs font-bold shadow-md shadow-[var(--copper-glow)]"
-              style={{ fontFamily: 'var(--font-heading)' }}
-            >
-              X
+            <div className="w-8 h-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center p-1 shadow-sm">
+              <XaivonLogo className="w-full h-full" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
@@ -768,7 +810,7 @@ export function ChatWindow({ onClose, isEmbed = false }: ChatWindowProps) {
 
         <div className="text-center pb-2">
           <span className="text-[10px] text-[var(--text-muted)]">
-            XAIVON AI Business Consultant • Confidential
+            XAIVON AI Business Consultant • Consultative Discovery
           </span>
         </div>
       </div>

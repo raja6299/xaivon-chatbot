@@ -2,6 +2,7 @@
 
 import React from "react";
 import { ChatWindow } from "@/components/chat/ChatWindow";
+import { XaivonLogo } from "@/components/brand/XaivonLogo";
 import { ArrowUpRight, ShieldCheck, Cpu, Layers } from "lucide-react";
 
 export default function Home() {
@@ -11,11 +12,8 @@ export default function Home() {
       <header className="border-b border-[var(--border-glass)] bg-[var(--bg-canvas)]/80 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-xl bg-[var(--copper-primary)] flex items-center justify-center text-white font-bold text-sm shadow-md shadow-[var(--copper-glow)]"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              X
+            <div className="w-9 h-9 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center p-1.5 shadow-sm">
+              <XaivonLogo className="w-full h-full" />
             </div>
             <div>
               <span className="font-semibold text-sm tracking-wide font-heading block leading-none">
@@ -29,8 +27,8 @@ export default function Home() {
 
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-secondary)]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--copper-primary)] animate-pulse"></span>
-              Consultant System Operational
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--copper-primary)]"></span>
+              AI Business Consultant
             </div>
 
             <a
@@ -57,7 +55,7 @@ export default function Home() {
         {/* Left Column: Strategic Context & Overview */}
         <section className="lg:col-span-5 space-y-6 pt-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--copper-glow)] border border-[var(--border-subtle)] text-[var(--copper-primary)] text-xs font-medium">
-            <Cpu className="w-3.5 h-3.5" /> Enterprise AI Consultant
+            <Cpu className="w-3.5 h-3.5" /> Consultative Discovery
           </div>
 
           <div className="space-y-3">
@@ -75,7 +73,7 @@ export default function Home() {
               <Layers className="w-4 h-4 text-[var(--copper-primary)] shrink-0 mt-0.5" />
               <div>
                 <h2 className="text-xs font-semibold text-[var(--text-primary)]">
-                  Logistics & Freight Automation
+                  Logistics &amp; Freight Automation
                 </h2>
                 <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
                   Automated quote intake, document parsing, and load dispatch workflows.
@@ -87,10 +85,10 @@ export default function Home() {
               <ShieldCheck className="w-4 h-4 text-[var(--copper-primary)] shrink-0 mt-0.5" />
               <div>
                 <h2 className="text-xs font-semibold text-[var(--text-primary)]">
-                  Secure Enterprise Infrastructure
+                  Deterministic Knowledge &amp; Scoped Discovery
                 </h2>
                 <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                  Production-grade security, zero-leakage RAG, and verified business facts.
+                  Grounded fact retrieval, strict prompt isolation, and custom operational scoping.
                 </p>
               </div>
             </div>
@@ -112,7 +110,7 @@ export default function Home() {
 
       {/* ─── Minimal Footer ─── */}
       <footer className="border-t border-[var(--border-glass)] py-4 text-center text-xs text-[var(--text-muted)]">
-        © {new Date().getFullYear()} XAIVON • All rights reserved • Confidential Enterprise AI Systems
+        &copy; {new Date().getFullYear()} XAIVON &bull; Operated by ADABHRA GROUP &bull; AI Workflow Architecture &amp; Assistance
       </footer>
     </main>
   );

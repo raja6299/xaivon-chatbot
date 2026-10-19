@@ -60,7 +60,7 @@ export const XAIVON_APPROVED_FACTS: ApprovedCompanyFacts = {
         'Exception alerting and human-in-the-loop review',
       ],
       pricingModel: 'custom_scoped',
-      priceGuidance: 'Custom scoped based on workflow complexity, system volume, and integration endpoints. Typical starter automation deployments begin around $799–$1,999, with enterprise workflow orchestration quoted per specification.',
+      priceGuidance: 'Custom-scoped on assessment based on workflow complexity, system volume, and integration endpoints. Requires operational discovery with founder Raja Babu.',
     },
     {
       id: 'ai-chatbots',
@@ -74,7 +74,7 @@ export const XAIVON_APPROVED_FACTS: ApprovedCompanyFacts = {
         'Seamless human handoff to direct email/calendar booking',
       ],
       pricingModel: 'custom_scoped',
-      priceGuidance: 'Tailored to domain scope and integration depth. Single-purpose website assistants typically range from $499–$1,299+, with omnichannel and CRM-connected systems scoped on assessment.',
+      priceGuidance: 'Custom-scoped on assessment based on domain scope, knowledge base size, and CRM integration depth. Evaluated individually upon discovery.',
     },
     {
       id: 'voice-ai',
@@ -87,7 +87,7 @@ export const XAIVON_APPROVED_FACTS: ApprovedCompanyFacts = {
         'CRM record creation and team notification',
       ],
       pricingModel: 'custom_scoped',
-      priceGuidance: 'Custom quoted based on expected call minutes, telephony provider setup, and customized speech persona requirements.',
+      priceGuidance: 'Custom-scoped on assessment based on anticipated call minutes, telephony provider infrastructure, and customized conversational requirements.',
     },
     {
       id: 'logistics-ai',
@@ -100,20 +100,20 @@ export const XAIVON_APPROVED_FACTS: ApprovedCompanyFacts = {
         'Carrier communication pipelines',
       ],
       pricingModel: 'custom_scoped',
-      priceGuidance: 'Project-based scoping starting from foundational quote ingestion ($1,499+) to multi-agent dispatch automation ($4,999+). Exact costs require operational discovery.',
+      priceGuidance: 'Custom-scoped on assessment based on daily load volume, document parsing complexity (BOLs, rate cons), and dispatch software integration points.',
     },
     {
       id: 'crm-data',
       category: 'Data & CRM Systems',
       title: 'CRM, Lead & Data Pipeline Automation',
-      description: 'Structured synchronization across Hubspot, Salesforce, Google Workspace, and internal operational databases.',
+      description: 'Structured synchronization across HubSpot, Salesforce, Google Workspace, and internal operational databases.',
       features: [
-        'Zero-loss lead deduplication and enrichment',
+        'Reliable lead deduplication and structured data enrichment',
         'Real-time webhook and event-driven data piping',
         'Safe data encryption and audit tracking',
       ],
       pricingModel: 'custom_scoped',
-      priceGuidance: 'Scoped based on schema complexity, record volume, and destination endpoints.',
+      priceGuidance: 'Custom-scoped on assessment based on schema complexity, record volume, synchronization frequency, and destination endpoints.',
     },
   ],
 
@@ -136,7 +136,7 @@ export const XAIVON_APPROVED_FACTS: ApprovedCompanyFacts = {
   ],
 
   disclaimers: {
-    pricing: 'All quotes are custom-tailored to business volume and architectural requirements. XAIVON does not offer one-size-fits-all fixed subscriptions without discovery.',
+    pricing: 'All pricing is strictly custom-scoped based on discovery and architecture assessment. XAIVON does not offer fixed-tier self-serve packages without an operational evaluation. To receive a tailored scope and investment estimate, contact Raja Babu directly at raja@xaivon.com or schedule via https://calendly.com/xaivon.',
     guarantees: 'XAIVON partners with businesses on measurable throughput improvements; exact SLA and operational guarantees are defined in formal written service agreements.',
   },
 };

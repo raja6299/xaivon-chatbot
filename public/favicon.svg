@@ -1,0 +1,22 @@
+<svg width="100%" height="100%" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="xaivonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C4704B" />
+      <stop offset="50%" stop-color="#D4805A" />
+      <stop offset="100%" stop-color="#E59873" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  
+  <g filter="url(#glow)">
+    <!-- Main Left-to-Right diagonal -->
+    <path d="M20 20 L40 20 L80 80 L60 80 Z" fill="url(#xaivonGrad)" />
+    
+    <!-- Right-to-Left diagonal (split for geometric/architectural look) -->
+    <path d="M80 20 L65 20 L45 50 L60 50 Z" fill="url(#xaivonGrad)" opacity="0.95" />
+    <path d="M40 58 L25 80 L40 80 L55 58 Z" fill="url(#xaivonGrad)" opacity="0.9" />
+  </g>
+</svg>

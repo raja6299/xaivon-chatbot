@@ -4,9 +4,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChatWindow } from './ChatWindow';
-import { MessageSquare, X } from 'lucide-react';
+import { XaivonLogo } from '@/components/brand/XaivonLogo';
+import { X } from 'lucide-react';
 
-const HIDDEN_ROUTES = ['/login', '/admin', '/embed'];
+const HIDDEN_ROUTES = ['/', '/login', '/admin', '/embed'];
 
 export function ChatWidget() {
   const pathname = usePathname();
@@ -78,7 +79,7 @@ export function ChatWidget() {
           ${
             isOpen
               ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-subtle)]'
-              : 'bg-[var(--copper-primary)] hover:bg-[var(--copper-light)] text-white shadow-[var(--shadow-button)] border border-white/10'
+              : 'bg-[var(--bg-surface)] hover:bg-[var(--bg-panel)] text-white shadow-[var(--shadow-button)] border border-[var(--copper-primary)]/40 p-2'
           }
         `}
         aria-label={isOpen ? 'Close chat consultation' : 'Open AI business consultant'}
@@ -93,7 +94,7 @@ export function ChatWidget() {
               exit={{ rotate: 45, opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5 text-[var(--text-primary)]" />
             </motion.div>
           ) : (
             <motion.div
@@ -102,8 +103,9 @@ export function ChatWidget() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
               transition={{ duration: 0.15 }}
+              className="w-full h-full flex items-center justify-center"
             >
-              <MessageSquare className="w-5 h-5 fill-current" />
+              <XaivonLogo className="w-7 h-7" />
             </motion.div>
           )}
         </AnimatePresence>

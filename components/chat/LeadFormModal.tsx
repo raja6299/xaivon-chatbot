@@ -659,23 +659,32 @@ export function LeadFormModal({ isOpen, onClose, onSubmit }: LeadFormModalProps)
                 {/* ---- Global error ---- */}
                 {formStatus === 'error' && (
                   <div
-                    className="flex items-center gap-2 bg-red-900/20 border border-red-500/20 rounded-xl px-3 py-2.5 animate-fade-in-up"
+                    className="flex flex-col gap-2.5 bg-red-950/30 border border-red-500/25 rounded-xl p-3 animate-fade-in-up"
                     role="alert"
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#f87171"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      aria-hidden="true"
+                    <div className="flex items-start gap-2">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#f87171"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        className="shrink-0 mt-0.5"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M15 9l-6 6M9 9l6 6" />
+                      </svg>
+                      <span className="text-red-300 text-xs leading-relaxed">{errorMessage}</span>
+                    </div>
+                    <a
+                      href={`mailto:raja@xaivon.com?subject=${encodeURIComponent(`Consultation Inquiry from ${formData.fullName || 'Prospective Client'} (${formData.company || 'Enterprise'})`)}&body=${encodeURIComponent(`Full Name: ${formData.fullName}\nCompany: ${formData.company}\nEmail: ${formData.email}\nPhone: ${formData.phone || 'N/A'}\n\n[Inquiry submitted via XAIVON AI Consultant]`)}`}
+                      className="inline-flex items-center justify-center gap-1.5 text-xs font-medium py-1.5 px-3 rounded-lg bg-[var(--copper-primary)] hover:bg-[var(--copper-light)] text-white transition-colors text-center"
                     >
-                      <circle cx="12" cy="12" r="10" />
-                      <path d="M15 9l-6 6M9 9l6 6" />
-                    </svg>
-                    <span className="text-red-300 text-xs">{errorMessage}</span>
+                      Email Founder Directly (raja@xaivon.com)
+                    </a>
                   </div>
                 )}
 

@@ -25,6 +25,10 @@ export function generateMetadata(): Metadata {
     ],
     authors: [{ name: "XAIVON" }],
     robots: { index: true, follow: true },
+    icons: {
+      icon: "/favicon.svg",
+      apple: "/favicon.svg",
+    },
     alternates: {
       canonical: siteUrl,
     },
@@ -34,6 +38,14 @@ export function generateMetadata(): Metadata {
         "Practical AI assistance and connected automation built around real business operations. Talk to our AI Business Consultant.",
       url: siteUrl,
       siteName: "XAIVON",
+      images: [
+        {
+          url: `${siteUrl}/og-image.png`,
+          width: 1200,
+          height: 630,
+          alt: "XAIVON AI Business Infrastructure",
+        },
+      ],
       locale: "en_US",
       type: "website",
     },
@@ -42,6 +54,7 @@ export function generateMetadata(): Metadata {
       title: "XAIVON | AI Business Infrastructure & Workflow Automation",
       description:
         "Practical AI assistance and connected automation built around real business operations.",
+      images: [`${siteUrl}/og-image.png`],
     },
   };
 }
